@@ -27,7 +27,7 @@ http.createServer(async (req, res) => {
   if (req.url.startsWith('/api/')) {
     try {
       const r = await fetch(BASE + req.url.slice(4), {
-        headers: { Authorization: `Bearer ${TOKEN}` },
+        headers: { Authorization: "Bearer " + TOKEN },
       });
       res.writeHead(r.status, { 'Content-Type': 'application/json' });
       res.end(await r.text());

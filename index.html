@@ -19,6 +19,20 @@
   tr.click{cursor:pointer} tr.click:hover{background:#f0f6ff}
   .badge{padding:2px 8px;border-radius:10px;font-size:.8em;background:#e2e8f0}
   .err{color:#b91c1c}
+  select{padding:8px;border:1px solid #ccc;border-radius:6px}
+  .stats{display:flex;flex-wrap:wrap;gap:8px}
+  .stat{flex:1;min-width:110px;border:2px solid #e2e8f0;border-radius:8px;padding:8px;text-align:center;cursor:pointer}
+  .stat.on{background:#eef4ff}
+  .stat b{display:block;font-size:1.5em}.stat span{font-size:.8em;color:#64748b}
+  .item{border:1px solid #e5e7eb;border-radius:8px;padding:10px;margin-bottom:8px;cursor:pointer}
+  .ghead{margin:16px 0 8px;padding-bottom:4px;border-bottom:2px solid #e2e8f0}
+  .item:hover{background:#fafcff}
+  .top{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .pill{color:#fff;padding:2px 9px;border-radius:10px;font-size:.78em;margin-right:4px}
+  .pill.late{background:#dc2626}
+  .tl{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:.8em;color:#94a3b8;flex-wrap:wrap}
+  .tl i{flex:0 0 24px;height:2px;background:#cbd5e1}
+  .tl .done{color:#166534;font-weight:600}.tl .cx{color:#b91c1c}
   pre{background:#0f172a;color:#e2e8f0;padding:10px;border-radius:6px;overflow:auto;max-height:300px}
 </style>
 </head>
@@ -56,6 +70,62 @@
   </div>
 
   <div class="card">
+    <h2>CardTrader Zero – stato ordini
+      <button class="sec" @click="loadBox">{{ boxLoading ? 'Carico…' : 'Aggiorna' }}</button></h2>
+    <p v-if="boxError" class="err">{{ boxError }}</p>
+    <div class="stats" v-if="box.length">
+      <div class="stat" :class="{on: filter==='all'}" @click="filter='all'">
+        <b>{{ box.length }}</b><span>Tutti</span></div>
+      <div class="stat" v-for="s in STATUSES" :key="s.key" :class="{on: filter===s.key}"
+           :style="{borderColor:s.color}" @click="filter=s.key">
+        <b :style="{color:s.color}">{{ counts[s.key] || 0 }}</b><span>{{ s.label }}</span></div>
+      <div class="stat"><b>{{ totalValue }}</b><span>Valore totale</span></div>
+    </div>
+    <div class="row" v-if="box.length" style="margin:12px 0">
+      <input v-model="q" placeholder="Cerca carta, espansione, venditore…">
+      <select v-model="sort">
+        <option value="paid">Data pagamento</option>
+        <option value="eta">Arrivo previsto</option>
+        <option value="price">Prezzo</option>
+        <option value="name">Nome</option>
+      </select>
+    </div>
+    <div class="row" v-if="box.length" style="margin-bottom:8px">
+      <strong>Raggruppa per:</strong>
+      <button :class="{sec: groupBy!==''}" @click="groupBy=''">Nessuno</button>
+      <button :class="{sec: groupBy!=='status'}" @click="groupBy='status'">Stato</button>
+      <button :class="{sec: groupBy!=='seller'}" @click="groupBy='seller'">Chi spedisce</button>
+    </div>
+    <p v-if="box.length">{{ shown.length }} articoli</p>
+    <template v-for="g in groups" :key="g.key">
+    <h3 v-if="groupBy" class="ghead">{{ g.label }} <small>· {{ g.items.length }} articoli · {{ g.total }}</small></h3>
+    <div class="item" v-for="b in g.items" :key="b.id" @click="toggle(b.id)">
+      <div class="top">
+        <div><strong>{{ b.name }}</strong>
+          <small> · {{ b.expansion }} <template v-if="b.quantity">· {{ qty(b) }}×</template>
+            <template v-if="b.properties && b.properties.mtg_foil"> · Foil</template>
+            <template v-if="b.properties && b.properties.condition"> · {{ b.properties.condition }}</template></small></div>
+        <div><span class="pill" :style="{background:st(b).color}">{{ st(b).label }}</span>
+          <span class="pill late" v-if="late(b)">In ritardo</span>
+          <b> {{ b.formatted_price }}</b></div>
+      </div>
+      <div class="tl">
+        <span :class="{done: b.paid_at}">Pagato {{ d(b.paid_at) }}</span>
+        <i></i>
+        <span :class="{done: b.arrived_at}">{{ b.arrived_at ? 'Arrivato ' + d(b.arrived_at) : 'Arrivo previsto ' + d(b.estimated_arrived_at) }}</span>
+        <template v-if="b.cancelled_at"><i></i><span class="done cx">Annullato {{ d(b.cancelled_at) }}</span></template>
+        <template v-if="b.return_to_seller"><i></i><span class="done cx">Reso al venditore</span></template>
+      </div>
+      <div v-if="open===b.id" @click.stop>
+        <p>Venditore: {{ b.seller && b.seller.username }} · ID articolo {{ b.id }}</p>
+        <details><summary>JSON completo</summary><pre>{{ JSON.stringify(b, null, 2) }}</pre></details>
+      </div>
+    </div>
+    </template>
+    <p v-if="boxLoaded && !boxLoading && !box.length">Nessun articolo nel box CT0.</p>
+  </div>
+
+  <div class="card">
     <h2>Ultimi ordini</h2>
     <p v-if="loading">Caricamento…</p>
     <table v-if="orders.length">
@@ -73,9 +143,60 @@
 
 <script>
 Vue.createApp({
-  data: () => ({ orders: [], order: null, idInput: '', error: '', loading: false }),
-  mounted() { this.loadList(); },
+  data: () => ({ orders: [], order: null, idInput: '', error: '', loading: false,
+    box: [], boxError: '', boxLoading: false, boxLoaded: false,
+    groupBy: '', filter: 'all', q: '', sort: 'paid', open: null,
+    STATUSES: [
+      { key: 'presale', label: 'Prevendita', color: '#7c3aed' },
+      { key: 'incoming', label: 'In arrivo', color: '#d97706' },
+      { key: 'arrived', label: 'Arrivato in box', color: '#16a34a' },
+      { key: 'returned', label: 'Reso', color: '#6b7280' },
+      { key: 'cancelled', label: 'Annullato', color: '#dc2626' }] }),
+  mounted() { this.loadList(); this.loadBox(); },
+  computed: {
+    counts() { const c = {}; this.box.forEach(b => { const k = this.st(b).key; c[k] = (c[k] || 0) + 1; }); return c; },
+    totalValue() {
+      const t = this.box.reduce((s, b) => s + ((b.buyer_price && b.buyer_price.cents) || 0) * this.qty(b), 0);
+      return (t / 100).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
+    },
+    groups() {
+      const fmt = c => (c / 100).toLocaleString('it-IT', { style: 'currency', currency: 'EUR' });
+      const mk = (key, label, items) => ({ key, label, items,
+        total: fmt(items.reduce((s, b) => s + ((b.buyer_price && b.buyer_price.cents) || 0) * this.qty(b), 0)) });
+      if (!this.groupBy) return [mk('all', '', this.shown)];
+      const m = new Map();
+      this.shown.forEach(b => {
+        const k = this.groupBy === 'status' ? this.st(b).key : ((b.seller && b.seller.username) || 'Sconosciuto');
+        if (!m.has(k)) m.set(k, []);
+        m.get(k).push(b);
+      });
+      if (this.groupBy === 'status')
+        return this.STATUSES.filter(s => m.has(s.key)).map(s => mk(s.key, s.label, m.get(s.key)));
+      return [...m].sort((a, b) => b[1].length - a[1].length).map(([k, v]) => mk(k, k, v));
+    },
+    shown() {
+      const q = this.q.toLowerCase();
+      let l = this.box.filter(b => (this.filter === 'all' || this.st(b).key === this.filter) &&
+        (!q || [b.name, b.expansion, b.seller && b.seller.username].join(' ').toLowerCase().includes(q)));
+      const t = x => (x ? new Date(x).getTime() : 0);
+      const s = this.sort;
+      return l.slice().sort((a, b) =>
+        s === 'name' ? (a.name || '').localeCompare(b.name || '') :
+        s === 'price' ? ((b.buyer_price && b.buyer_price.cents) || 0) - ((a.buyer_price && a.buyer_price.cents) || 0) :
+        s === 'eta' ? t(a.estimated_arrived_at) - t(b.estimated_arrived_at) :
+        t(b.paid_at) - t(a.paid_at));
+    }
+  },
   methods: {
+    st(b) {
+      const k = b.cancelled_at ? 'cancelled' : b.return_to_seller ? 'returned' : b.arrived_at ? 'arrived'
+        : b.presale ? 'presale' : 'incoming';
+      return this.STATUSES.find(s => s.key === k);
+    },
+    late(b) { return !b.arrived_at && !b.cancelled_at && !b.return_to_seller && b.estimated_arrived_at && new Date(b.estimated_arrived_at) < new Date(); },
+    qty(b) { return b.quantity ? Object.values(b.quantity).reduce((a, n) => a + (+n || 0), 0) : 1; },
+    d(x) { return x ? new Date(x).toLocaleDateString('it-IT') : '—'; },
+    toggle(id) { this.open = this.open === id ? null : id; },
     async api(path) {
       const r = await fetch('/api' + path);
       const j = await r.json().catch(() => ({}));
@@ -89,6 +210,15 @@ Vue.createApp({
         this.orders = Array.isArray(j) ? j : (j.array || j.orders || []);
       } catch (e) { this.error = e.message; }
       this.loading = false;
+    },
+    async loadBox() {
+      this.boxLoading = true; this.boxError = '';
+      try {
+        const j = await this.api('/ct0_box_items');
+        this.box = Array.isArray(j) ? j : (j.array || j.ct0_box_items || j.items || []);
+        this.boxLoaded = true;
+      } catch (e) { this.boxError = e.message; }
+      this.boxLoading = false;
     },
     async loadOrder(id) {
       if (!id) return;

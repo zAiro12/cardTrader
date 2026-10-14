@@ -35,3 +35,7 @@ Se il token manca il server si ferma con un messaggio di errore.
 - `card_trader_postman_collection.json`: collection Postman con gli endpoint di riferimento.
 
 Nota: se l'elenco ordini risulta vuoto, il token usato potrebbe non avere ordini associati al tuo account.
+
+## Dashboard CardTrader Zero
+
+Usa l'endpoint `/api/ct0_box_items`. Lo stato viene derivato dalle date: annullato, reso al venditore, arrivato, prevendita, in arrivo (con flag *In ritardo* se la data stimata è passata). Puoi filtrare per stato, cercare e ordinare. I pulsanti "Raggruppa per" (Nessuno / Stato / Chi spedisce) dividono gli articoli in gruppi con conteggio e valore totale.
