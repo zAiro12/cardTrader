@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stato ordini CardTrader</title>
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<style>
+  body{font-family:system-ui,sans-serif;background:#f4f5f7;margin:0;color:#222}
+  main{max-width:900px;margin:0 auto;padding:20px}
+  h1{margin-top:0}
+  .card{background:#fff;border-radius:8px;padding:16px;margin-bottom:16px;box-shadow:0 1px 3px #0002}
+  .row{display:flex;gap:8px}
+  input{flex:1;padding:8px;border:1px solid #ccc;border-radius:6px}
+  button{padding:8px 14px;border:0;border-radius:6px;background:#2563eb;color:#fff;cursor:pointer}
+  button.sec{background:#64748b}
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #eee}
+  tr.click{cursor:pointer} tr.click:hover{background:#f0f6ff}
+  .badge{padding:2px 8px;border-radius:10px;font-size:.8em;background:#e2e8f0}
+  .err{color:#b91c1c}
+  pre{background:#0f172a;color:#e2e8f0;padding:10px;border-radius:6px;overflow:auto;max-height:300px}
+</style>
+</head>
+<body>
+<div id="app"><main>
+  <h1>Stato dei miei ordini</h1>
+
+  <div class="card">
+    <div class="row">
+      <input v-model="idInput" placeholder="ID ordine" @keyup.enter="loadOrder(idInput)">
+      <button @click="loadOrder(idInput)">Cerca</button>
+      <button class="sec" @click="loadList">Ricarica lista</button>
+    </div>
+    <p v-if="error" class="err">{{ error }}</p>
+  </div>
+
+  <div class="card" v-if="order">
+    <h2>Ordine #{{ order.id }} <span class="badge">{{ order.state }}</span></h2>
+    <p v-if="order.code">Codice: {{ order.code }}</p>
+    <p v-if="order.seller">Venditore: {{ name(order.seller) }}</p>
+    <p v-if="order.buyer">Acquirente: {{ name(order.buyer) }}</p>
+    <p v-if="order.created_at">Creato: {{ fmt(order.created_at) }}</p>
+    <p v-if="order.paid_at">Pagato: {{ fmt(order.paid_at) }}</p>
+    <p v-if="order.sent_at">Spedito: {{ fmt(order.sent_at) }}</p>
+    <p v-if="order.tracking_code">Tracking: {{ order.tracking_code }}</p>
+    <p v-if="order.order_items && order.order_items.length"><strong>Articoli</strong></p>
+    <table v-if="order.order_items && order.order_items.length">
+      <tr v-for="i in order.order_items" :key="i.id">
+        <td>{{ i.quantity }}×</td>
+        <td>{{ i.name || i.blueprint_name || i.blueprint_id }}</td>
+        <td>{{ money(i.price) }}</td>
+      </tr>
+    </table>
+    <details><summary>JSON completo</summary><pre>{{ JSON.stringify(order, null, 2) }}</pre></details>
+  </div>
+
+  <div class="card">
+    <h2>Ultimi ordini</h2>
+    <p v-if="loading">Caricamento…</p>
+    <table v-if="orders.length">
+      <tr><th>ID</th><th>Stato</th><th>Data</th><th>Controparte</th></tr>
+      <tr class="click" v-for="o in orders" :key="o.id" @click="loadOrder(o.id)">
+        <td>{{ o.id }}</td>
+        <td><span class="badge">{{ o.state }}</span></td>
+        <td>{{ fmt(o.created_at) }}</td>
+        <td>{{ name(o.seller) || name(o.buyer) }}</td>
+      </tr>
+    </table>
+    <p v-else-if="!loading">Nessun ordine trovato.</p>
+  </div>
+</main></div>
+
+<script>
+Vue.createApp({
+  data: () => ({ orders: [], order: null, idInput: '', error: '', loading: false }),
+  mounted() { this.loadList(); },
+  methods: {
+    async api(path) {
+      const r = await fetch('/api' + path);
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(`Errore ${r.status}: ${j.errors || j.error || ''}`);
+      return j;
+    },
+    async loadList() {
+      this.loading = true; this.error = '';
+      try {
+        const j = await this.api('/orders?sort=date.desc');
+        this.orders = Array.isArray(j) ? j : (j.array || j.orders || []);
+      } catch (e) { this.error = e.message; }
+      this.loading = false;
+    },
+    async loadOrder(id) {
+      if (!id) return;
+      this.error = '';
+      try { this.order = await this.api('/orders/' + encodeURIComponent(id)); this.idInput = id; }
+      catch (e) { this.error = e.message; this.order = null; }
+    },
+    name(u) { return u ? (u.username || u.name || '') : ''; },
+    fmt(d) { return d ? new Date(d).toLocaleString('it-IT') : ''; },
+    money(p) {
+      if (p == null) return '';
+      if (typeof p === 'object') return (p.formatted || (p.cents / 100) + ' ' + (p.currency || ''));
+      return p;
+    },
+  },
+}).mount('#app');
+</script>
+</body>
+</html>
