@@ -1,0 +1,37 @@
+# CardTrader Order Status
+
+Piccolo sito web per consultare l'elenco e lo stato dei tuoi ordini tramite le API di CardTrader (`https://api.cardtrader.com/api/v2`). Permette anche di trovare l'ID di un ordine e vederne il dettaglio.
+
+## Requisiti
+
+- Node.js 18 o superiore (serve `fetch` nativo). Nessuna dipendenza da installare.
+- Un token API CardTrader (Profilo CardTrader → Impostazioni).
+- Un browser moderno (Vue 3 viene caricato da CDN, serve quindi connessione internet).
+
+## Configurazione del token
+
+Il token non va mai committato. Puoi fornirlo in uno di questi modi (in ordine di priorità):
+
+1. Variabile d'ambiente `CARDTRADER_TOKEN`
+2. File `token.txt` nella cartella del progetto, contenente solo il token
+3. File `.env` con una riga `CARDTRADER_TOKEN=...`
+
+`token.txt` e `.env` sono in `.gitignore`.
+
+## Avvio
+
+```powershell
+node server.js
+```
+
+Poi apri http://localhost:3000. Per cambiare porta: `$env:PORT=8080; node server.js`.
+
+Se il token manca il server si ferma con un messaggio di errore.
+
+## Panoramica
+
+- `server.js`: server Node senza dipendenze. Serve `index.html` e fa da proxy: le richieste a `/api/*` vengono inoltrate a CardTrader aggiungendo l'header `Authorization: Bearer <token>`. Così il token resta lato server e si evitano problemi CORS.
+- `index.html`: interfaccia Vue 3 (CDN). Elenca gli ordini (`GET /orders?sort=date.desc`) e mostra il dettaglio di un ordine (`GET /orders/{id}`).
+- `card_trader_postman_collection.json`: collection Postman con gli endpoint di riferimento.
+
+Nota: se l'elenco ordini risulta vuoto, il token usato potrebbe non avere ordini associati al tuo account.
