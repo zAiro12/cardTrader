@@ -42,7 +42,7 @@
 
   <div class="card">
     <h2>CardTrader Zero – stato ordini
-      <button class="sec" @click="loadBox">{{ boxLoading ? 'Carico…' : 'Aggiorna' }}</button></h2>
+      <button class="sec" @click="loadBox()">{{ boxLoading ? 'Carico…' : 'Aggiorna' }}</button></h2>
     <p v-if="boxError" class="err">{{ boxError }}</p>
     <div class="stats" v-if="box.length">
       <div class="stat" :class="{on: filter==='all'}" @click="filter='all'">
@@ -120,7 +120,8 @@
     </table>
     <p v-else-if="!loading">Nessun ordine trovato.</p>
   </div>
-</main></div>
+</main>
+<footer style="text-align:center;padding:12px;color:#888;font-size:13px">Ultimo aggiornamento: {{ lastUpdate || '—' }} · auto ogni 5s</footer></div>
 
 <script src="app.js"></script>
 </body>

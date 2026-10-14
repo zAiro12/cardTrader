@@ -1,6 +1,6 @@
 Vue.createApp({
-  data: () => ({ orders: [], order: null, idInput: '', error: '', loading: false,
-    box: [], boxError: '', boxLoading: false, boxLoaded: false,
+  data: () => ({ orders: [], order: null, idInput: '', error: '', loading: false, lastUpdate: '',
+    box: [], boxError: '', boxLoading: false, busy: false, boxLoaded: false,
     groupBy: '', filter: 'all', q: '', sort: 'paid', dir: -1, collapsed: {}, open: null,
     STATUSES: [
       { key: 'presale', label: 'Prevendita', color: '#7c3aed' },
@@ -8,7 +8,7 @@ Vue.createApp({
       { key: 'arrived', label: 'Arrivato in box', color: '#16a34a' },
       { key: 'returned', label: 'Reso', color: '#6b7280' },
       { key: 'cancelled', label: 'Annullato', color: '#dc2626' }] }),
-  mounted() { this.loadList(); this.loadBox(); },
+  mounted() { this.loadList(); this.loadBox(); setInterval(() => this.loadBox(true), 5000); },
   computed: {
     counts() { const c = {}; this.box.forEach(b => { const k = this.st(b).key; c[k] = (c[k] || 0) + 1; }); return c; },
     totalValue() {
@@ -77,13 +77,17 @@ Vue.createApp({
       } catch (e) { this.error = e.message; }
       this.loading = false;
     },
-    async loadBox() {
-      this.boxLoading = true; this.boxError = '';
+    async loadBox(silent) {
+      if (this.boxLoading || this.busy) return;
+      this.busy = true;
+      if (silent !== true) { this.boxLoading = true; this.boxError = ''; }
       try {
         const j = await this.api('/ct0_box_items');
         this.box = Array.isArray(j) ? j : (j.array || j.ct0_box_items || j.items || []);
         this.boxLoaded = true;
-      } catch (e) { this.boxError = e.message; }
+        this.lastUpdate = new Date().toLocaleTimeString('it-IT');
+      } catch (e) { if (silent !== true) this.boxError = e.message; }
+      this.busy = false;
       this.boxLoading = false;
     },
     async loadOrder(id) {
