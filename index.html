@@ -86,20 +86,30 @@
       <select v-model="sort">
         <option value="paid">Data pagamento</option>
         <option value="eta">Arrivo previsto</option>
+        <option value="arrived">Data arrivo effettivo</option>
         <option value="price">Prezzo</option>
-        <option value="name">Nome</option>
+        <option value="name">Titolo</option>
+        <option value="seller">Chi spedisce</option>
+        <option value="exp">Espansione</option>
+        <option value="status">Stato</option>
+        <option value="qty">Quantità</option>
       </select>
+      <button class="sec" @click="dir = -dir" :title="dir===1 ? 'Crescente' : 'Decrescente'">{{ dir === 1 ? '▲ Crescente' : '▼ Decrescente' }}</button>
     </div>
     <div class="row" v-if="box.length" style="margin-bottom:8px">
       <strong>Raggruppa per:</strong>
       <button :class="{sec: groupBy!==''}" @click="groupBy=''">Nessuno</button>
       <button :class="{sec: groupBy!=='status'}" @click="groupBy='status'">Stato</button>
       <button :class="{sec: groupBy!=='seller'}" @click="groupBy='seller'">Chi spedisce</button>
+      <template v-if="groupBy">
+        <button class="sec" @click="groups.forEach(g => collapsed[g.key] = true)">Comprimi tutto</button>
+        <button class="sec" @click="collapsed = {}">Espandi tutto</button>
+      </template>
     </div>
     <p v-if="box.length">{{ shown.length }} articoli</p>
     <template v-for="g in groups" :key="g.key">
-    <h3 v-if="groupBy" class="ghead">{{ g.label }} <small>· {{ g.items.length }} articoli · {{ g.total }}</small></h3>
-    <div class="item" v-for="b in g.items" :key="b.id" @click="toggle(b.id)">
+    <h3 v-if="groupBy" class="ghead" style="cursor:pointer" @click="collapsed[g.key] = !collapsed[g.key]">{{ collapsed[g.key] ? '▶' : '▼' }} {{ g.label }} <small>· {{ g.items.length }} articoli · {{ g.total }}</small></h3>
+    <div class="item" v-for="b in (groupBy && collapsed[g.key] ? [] : g.items)" :key="b.id" @click="toggle(b.id)">
       <div class="top">
         <div><strong>{{ b.name }}</strong>
           <small> · {{ b.expansion }} <template v-if="b.quantity">· {{ qty(b) }}×</template>
@@ -145,7 +155,7 @@
 Vue.createApp({
   data: () => ({ orders: [], order: null, idInput: '', error: '', loading: false,
     box: [], boxError: '', boxLoading: false, boxLoaded: false,
-    groupBy: '', filter: 'all', q: '', sort: 'paid', open: null,
+    groupBy: '', filter: 'all', q: '', sort: 'paid', dir: -1, collapsed: {}, open: null,
     STATUSES: [
       { key: 'presale', label: 'Prevendita', color: '#7c3aed' },
       { key: 'incoming', label: 'In arrivo', color: '#d97706' },
@@ -178,13 +188,23 @@ Vue.createApp({
       const q = this.q.toLowerCase();
       let l = this.box.filter(b => (this.filter === 'all' || this.st(b).key === this.filter) &&
         (!q || [b.name, b.expansion, b.seller && b.seller.username].join(' ').toLowerCase().includes(q)));
-      const t = x => (x ? new Date(x).getTime() : 0);
-      const s = this.sort;
-      return l.slice().sort((a, b) =>
-        s === 'name' ? (a.name || '').localeCompare(b.name || '') :
-        s === 'price' ? ((b.buyer_price && b.buyer_price.cents) || 0) - ((a.buyer_price && a.buyer_price.cents) || 0) :
-        s === 'eta' ? t(a.estimated_arrived_at) - t(b.estimated_arrived_at) :
-        t(b.paid_at) - t(a.paid_at));
+      const s = this.sort, dir = this.dir;
+      const t = x => (x ? new Date(x).getTime() : null);
+      const order = k => this.STATUSES.findIndex(x => x.key === k);
+      const val = b =>
+        s === 'name' ? (b.name || '').toLowerCase() :
+        s === 'seller' ? ((b.seller && b.seller.username) || '').toLowerCase() :
+        s === 'exp' ? (b.expansion && b.expansion.name || b.expansion || '').toString().toLowerCase() :
+        s === 'price' ? ((b.buyer_price && b.buyer_price.cents) || 0) :
+        s === 'qty' ? this.qty(b) :
+        s === 'status' ? order(this.st(b).key) :
+        s === 'eta' ? t(b.estimated_arrived_at) :
+        s === 'arrived' ? t(b.arrived_at) : t(b.paid_at);
+      return l.slice().sort((a, b) => {
+        const x = val(a), y = val(b);
+        if (x === null || y === null) return x === y ? 0 : x === null ? 1 : -1;
+        return (typeof x === 'string' ? x.localeCompare(y) : x - y) * dir;
+      });
     }
   },
   methods: {
