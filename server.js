@@ -37,7 +37,13 @@ http.createServer(async (req, res) => {
     }
     return;
   }
-  const file = path.join(__dirname, 'index.html');
-  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+  const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'application/javascript; charset=utf-8' };
+  const name = req.url.split('?')[0] === '/' ? 'index.html' : path.basename(req.url.split('?')[0]);
+  const ext = path.extname(name);
+  const file = path.join(__dirname, name);
+  if (!types[ext] || !fs.existsSync(file) || name === 'server.js') {
+    res.writeHead(404); return res.end('Not found');
+  }
+  res.writeHead(200, { 'Content-Type': types[ext] });
   fs.createReadStream(file).pipe(res);
 }).listen(PORT, () => console.log(`http://localhost:${PORT}`));
