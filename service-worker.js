@@ -1,14 +1,7 @@
-const CACHE_NAME = 'cardtrader-pwa-v2';
-const APP_SHELL = [
-  '/',
-  '/index.html',
-  '/style.css',
-  '/app.js',
-  '/manifest.webmanifest',
-  '/icon-192.png',
-  '/icon-512.png',
-  '/icon.svg',
-];
+const CACHE_NAME = 'cardtrader-pwa-v3';
+const BASE = new URL('./', self.location).pathname;
+const APP_SHELL = ['', 'index.html', 'style.css', 'config.js', 'app.js', 'manifest.webmanifest',
+  'icon-192.png', 'icon-512.png', 'icon.svg'].map(file => BASE + file);
 const VUE_URL = 'https://unpkg.com/vue@3/dist/vue.global.prod.js';
 
 self.addEventListener('install', event => {
@@ -54,7 +47,7 @@ self.addEventListener('fetch', event => {
         }
         return response;
       } catch (error) {
-        const cached = await caches.match(request) || await caches.match('/index.html');
+        const cached = await caches.match(request) || await caches.match(BASE + 'index.html');
         if (cached) return cached;
         throw error;
       }
@@ -86,17 +79,16 @@ self.addEventListener('push', event => {
   }
   event.waitUntil(self.registration.showNotification(data.title || 'CardTrader', {
     body: data.body || 'Lo stato di un articolo è cambiato.',
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
+    icon: BASE + 'icon-192.png',
+    badge: BASE + 'icon-192.png',
     tag: data.tag || 'cardtrader-status',
-    data: { url: data.url || '/' },
   }));
 });
 
 self.addEventListener('notificationclick', event => {
   event.notification.close();
   event.waitUntil((async () => {
-    const target = new URL(event.notification.data?.url || '/', self.location.origin).href;
+    const target = self.registration.scope;
     const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const client of windows) {
       if (client.url === target && 'focus' in client) return client.focus();

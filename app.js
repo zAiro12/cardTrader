@@ -1,3 +1,5 @@
+const API_BASE = ((window.APP_CONFIG && window.APP_CONFIG.apiBase) || '').replace(/\/+$/, '');
+
 Vue.createApp({
   data: () => ({ orders: [], order: null, idInput: '', error: '', loading: false, lastUpdate: '',
     canInstall: false, installPrompt: null,
@@ -17,7 +19,7 @@ Vue.createApp({
     this.loadBox();
     setInterval(() => this.loadBox(true), 5000);
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/service-worker.js')
+      navigator.serviceWorker.register('service-worker.js')
         .then(() => this.refreshNotifications())
         .catch(error => {
           console.error('Registrazione della modalità offline non riuscita:', error);
@@ -118,7 +120,7 @@ Vue.createApp({
             applicationServerKey: this.decodeVapidKey(config.publicKey),
           });
         }
-        const response = await fetch('/api/push/subscribe', {
+        const response = await fetch(API_BASE + '/api/push/subscribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(subscription),
@@ -142,7 +144,7 @@ Vue.createApp({
         const registration = await navigator.serviceWorker.ready;
         const subscription = await registration.pushManager.getSubscription();
         if (subscription) {
-          const response = await fetch('/api/push/unsubscribe', {
+          const response = await fetch(API_BASE + '/api/push/unsubscribe', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ endpoint: subscription.endpoint }),
@@ -182,7 +184,7 @@ Vue.createApp({
     d(x) { return x ? new Date(x).toLocaleDateString('it-IT') : '—'; },
     toggle(id) { this.open = this.open === id ? null : id; },
     async api(path) {
-      const r = await fetch('/api' + path);
+      const r = await fetch(API_BASE + '/api' + path);
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(`Errore ${r.status}: ${j.errors || j.error || ''}`);
       return j;

@@ -57,6 +57,16 @@ Riavvia `node server.js`. Il server controlla CardTrader ogni minuto e avvisa qu
 
 Non rigenerare le chiavi VAPID dopo aver registrato i dispositivi: le sottoscrizioni esistenti dipendono da quella coppia.
 
+## Pubblicazione su GitHub Pages
+
+Il workflow [pages.yml](.github/workflows/pages.yml) pubblica l'interfaccia statica a ogni push su `main`. Il backend (proxy CardTrader col token, push, controllo stati) non può girare su Pages e va ospitato altrove (es. Vercel).
+
+1. Repository → Settings → Pages → Source: **GitHub Actions**.
+2. Settings → Secrets and variables → Actions → Variables: crea `API_BASE_URL` con l'URL del backend (es. `https://mio-backend.vercel.app`).
+3. Sul backend imposta `ALLOWED_ORIGIN` con l'origine di Pages (es. `https://utente.github.io`, senza percorso) e le variabili `CARDTRADER_TOKEN` e `VAPID_*`.
+
+Il workflow genera `config.js` con `API_BASE_URL`; in locale `config.js` resta vuoto e le API sono quelle dello stesso server.
+
 ## Panoramica
 
 - `server.js`: server Node con la dipendenza web-push. Serve `index.html` e fa da proxy: le richieste a `/api/*` vengono inoltrate a CardTrader aggiungendo l'header `Authorization: Bearer <token>`. Così il token resta lato server e si evitano problemi CORS.

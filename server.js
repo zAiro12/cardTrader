@@ -36,6 +36,8 @@ const VAPID_PUBLIC_KEY = loadSetting('VAPID_PUBLIC_KEY');
 const VAPID_PRIVATE_KEY = loadSetting('VAPID_PRIVATE_KEY');
 const VAPID_SUBJECT = loadSetting('VAPID_SUBJECT') || 'mailto:admin@example.com';
 const PUSH_ENABLED = Boolean(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY);
+// Origine del sito su GitHub Pages (es. https://utente.github.io), abilitata via CORS.
+const ALLOWED_ORIGIN = (loadSetting('ALLOWED_ORIGIN') || '').replace(/\/+$/, '') || null;
 
 if (PUSH_ENABLED) {
   webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
@@ -72,7 +74,7 @@ function isSameOrigin(req) {
   try {
     const origin = new URL(req.headers.origin);
     return (origin.protocol === 'https:' || origin.protocol === 'http:') &&
-      origin.host.toLowerCase() === req.headers.host.toLowerCase();
+      (origin.host.toLowerCase() === req.headers.host.toLowerCase() || origin.origin === ALLOWED_ORIGIN);
   } catch {
     return false;
   }
@@ -188,6 +190,16 @@ async function pollStatusChanges() {
 
 http.createServer(async (req, res) => {
   const requestUrl = new URL(req.url, 'http://localhost');
+  if (requestUrl.pathname.startsWith('/api/') && ALLOWED_ORIGIN && req.headers.origin === ALLOWED_ORIGIN) {
+    res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204);
+      return res.end();
+    }
+  }
   if (requestUrl.pathname.startsWith('/api/push/')) {
     if (requestUrl.pathname === '/api/push/config' && req.method === 'GET') {
       return sendJson(res, 200, { enabled: PUSH_ENABLED, publicKey: PUSH_ENABLED ? VAPID_PUBLIC_KEY : null });
