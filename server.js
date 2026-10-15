@@ -27,9 +27,10 @@ function loadSetting(name) {
   return match ? match[1].trim() : null;
 }
 const TOKEN = loadToken();
+const isMain = require.main === module;
 if (!TOKEN) {
-  console.error('Token mancante: crea il file token.txt con il token CardTrader, oppure imposta CARDTRADER_TOKEN (anche in .env).');
-  process.exit(1);
+  console.error('Token mancante: crea il file token.txt con il token CardTrader, oppure imposta CARDTRADER_TOKEN (anche in .env o nelle variabili d\'ambiente).');
+  if (isMain) process.exit(1);
 }
 const PORT = process.env.PORT || 3000;
 const VAPID_PUBLIC_KEY = loadSetting('VAPID_PUBLIC_KEY');
@@ -188,8 +189,9 @@ async function pollStatusChanges() {
   }
 }
 
-http.createServer(async (req, res) => {
+async function handler(req, res) {
   const requestUrl = new URL(req.url, 'http://localhost');
+  if (!TOKEN) return sendJson(res, 500, { error: 'Token CardTrader non configurato sul server.' });
   if (requestUrl.pathname.startsWith('/api/') && ALLOWED_ORIGIN && req.headers.origin === ALLOWED_ORIGIN) {
     res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGIN);
     res.setHeader('Vary', 'Origin');
@@ -288,7 +290,13 @@ http.createServer(async (req, res) => {
   if (name === 'service-worker.js' || name === 'manifest.webmanifest') headers['Cache-Control'] = 'no-cache';
   res.writeHead(200, headers);
   fs.createReadStream(file).pipe(res);
-}).listen(PORT, () => console.log(`http://localhost:${PORT}`));
+}
 
-const pushPoll = setInterval(pollStatusChanges, PUSH_POLL_INTERVAL);
-pushPoll.unref();
+module.exports = handler;
+
+// In locale parte come server standalone; su Vercel viene usato solo l'handler esportato.
+if (isMain) {
+  http.createServer(handler).listen(PORT, () => console.log(`http://localhost:${PORT}`));
+  const pushPoll = setInterval(pollStatusChanges, PUSH_POLL_INTERVAL);
+  pushPoll.unref();
+}

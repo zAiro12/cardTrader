@@ -70,7 +70,7 @@ Il workflow genera `config.js` con `API_BASE_URL`; in locale `config.js` resta v
 ## Panoramica
 
 - `server.js`: server Node con la dipendenza web-push. Serve `index.html` e fa da proxy: le richieste a `/api/*` vengono inoltrate a CardTrader aggiungendo l'header `Authorization: Bearer <token>`. Così il token resta lato server e si evitano problemi CORS.
-- `index.html`, `style.css`, `app.js`: markup, stili e logica dell'interfaccia Vue 3 (CDN). Nella vista CT0 si può raggruppare (stato / chi spedisce), ordinare per vari campi in modo crescente o decrescente e comprimere i gruppi. Elenca gli ordini (`GET /orders?sort=date.desc`) e mostra il dettaglio di un ordine (`GET /orders/{id}`).
+- `index.html`, `style.css`, `main.js`: markup, stili e logica dell'interfaccia Vue 3 (CDN). Nella vista CT0 si può raggruppare (stato / chi spedisce), ordinare per vari campi in modo crescente o decrescente e comprimere i gruppi. Elenca gli ordini (`GET /orders?sort=date.desc`) e mostra il dettaglio di un ordine (`GET /orders/{id}`).
 - `card_trader_postman_collection.json`: collection Postman con gli endpoint di riferimento.
 
 Nota: se l'elenco ordini risulta vuoto, il token usato potrebbe non avere ordini associati al tuo account.
