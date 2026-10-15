@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cardtrader-pwa-v1';
+const CACHE_NAME = 'cardtrader-pwa-v2';
 const APP_SHELL = [
   '/',
   '/index.html',
@@ -75,4 +75,32 @@ self.addEventListener('fetch', event => {
       return response;
     })());
   }
+});
+
+self.addEventListener('push', event => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (error) {
+    console.error('Payload della notifica push non valido:', error);
+  }
+  event.waitUntil(self.registration.showNotification(data.title || 'CardTrader', {
+    body: data.body || 'Lo stato di un articolo è cambiato.',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    tag: data.tag || 'cardtrader-status',
+    data: { url: data.url || '/' },
+  }));
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  event.waitUntil((async () => {
+    const target = new URL(event.notification.data?.url || '/', self.location.origin).href;
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const client of windows) {
+      if (client.url === target && 'focus' in client) return client.focus();
+    }
+    return self.clients.openWindow(target);
+  })());
 });

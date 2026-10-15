@@ -1,6 +1,9 @@
 Vue.createApp({
   data: () => ({ orders: [], order: null, idInput: '', error: '', loading: false, lastUpdate: '',
     canInstall: false, installPrompt: null,
+    notificationSupported: 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window,
+    notificationsEnabled: false, notificationBusy: false, notificationMessage: '', notificationError: false,
+    pushServerReady: false,
     box: [], boxError: '', boxLoading: false, busy: false, boxLoaded: false,
     groupBy: '', filter: 'all', q: '', sort: 'paid', dir: -1, collapsed: {}, open: null,
     STATUSES: [
@@ -15,7 +18,12 @@ Vue.createApp({
     setInterval(() => this.loadBox(true), 5000);
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/service-worker.js')
-        .catch(error => console.error('Registrazione della modalità offline non riuscita:', error));
+        .then(() => this.refreshNotifications())
+        .catch(error => {
+          console.error('Registrazione della modalità offline non riuscita:', error);
+          this.notificationError = true;
+          this.notificationMessage = 'Impossibile preparare il servizio notifiche.';
+        });
     }
     window.addEventListener('beforeinstallprompt', event => {
       event.preventDefault();
@@ -72,6 +80,91 @@ Vue.createApp({
     }
   },
   methods: {
+    async refreshNotifications() {
+      if (!this.notificationSupported) return;
+      this.notificationError = false;
+      try {
+        const config = await this.api('/push/config');
+        this.pushServerReady = config.enabled && Boolean(config.publicKey);
+        if (!this.pushServerReady) {
+          this.notificationMessage = 'Notifiche push non configurate sul server. Consulta le istruzioni nel README.';
+          return;
+        }
+        const registration = await navigator.serviceWorker.ready;
+        this.notificationsEnabled = Boolean(await registration.pushManager.getSubscription());
+        this.notificationMessage = this.notificationsEnabled ? 'Notifiche attive su questo dispositivo.' : '';
+      } catch (error) {
+        this.notificationError = true;
+        this.notificationMessage = error.message;
+      }
+    },
+    async enableNotifications() {
+      if (this.notificationBusy) return;
+      this.notificationBusy = true;
+      this.notificationError = false;
+      try {
+        const permission = Notification.permission === 'granted'
+          ? 'granted' : await Notification.requestPermission();
+        if (permission !== 'granted') throw new Error('Consenti le notifiche nelle impostazioni del browser per attivarle.');
+
+        const config = await this.api('/push/config');
+        if (!config.enabled || !config.publicKey) throw new Error('Notifiche push non configurate sul server.');
+
+        const registration = await navigator.serviceWorker.ready;
+        let subscription = await registration.pushManager.getSubscription();
+        if (!subscription) {
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: this.decodeVapidKey(config.publicKey),
+          });
+        }
+        const response = await fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(subscription),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || `Errore ${response.status} durante l’attivazione.`);
+        this.notificationsEnabled = true;
+        this.notificationMessage = 'Notifiche attive su questo dispositivo.';
+      } catch (error) {
+        this.notificationError = true;
+        this.notificationMessage = error.message;
+      } finally {
+        this.notificationBusy = false;
+      }
+    },
+    async disableNotifications() {
+      if (this.notificationBusy) return;
+      this.notificationBusy = true;
+      this.notificationError = false;
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        if (subscription) {
+          const response = await fetch('/api/push/unsubscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ endpoint: subscription.endpoint }),
+          });
+          const result = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(result.error || `Errore ${response.status} durante la disattivazione.`);
+          await subscription.unsubscribe();
+        }
+        this.notificationsEnabled = false;
+        this.notificationMessage = 'Notifiche disattivate su questo dispositivo.';
+      } catch (error) {
+        this.notificationError = true;
+        this.notificationMessage = error.message;
+      } finally {
+        this.notificationBusy = false;
+      }
+    },
+    decodeVapidKey(value) {
+      const padding = '='.repeat((4 - value.length % 4) % 4);
+      const decoded = atob((value + padding).replace(/-/g, '+').replace(/_/g, '/'));
+      return Uint8Array.from(decoded, character => character.charCodeAt(0));
+    },
     async installApp() {
       if (!this.installPrompt) return;
       await this.installPrompt.prompt();

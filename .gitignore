@@ -1,3 +1,5 @@
 .env
 token.txt
 node_modules/
+push-data.json
+push-data.json.tmp

@@ -22,6 +22,19 @@
     <button v-if="canInstall" @click="installApp">Installa app</button>
   </div>
 
+  <div class="card notifications">
+    <div>
+      <h2>Notifiche di stato</h2>
+      <p>Ricevi un avviso quando cambia lo stato di un articolo, anche con l’app chiusa.</p>
+      <p v-if="notificationMessage" :class="{err: notificationError}">{{ notificationMessage }}</p>
+      <p v-if="!notificationSupported">Questo browser non supporta le notifiche push.</p>
+    </div>
+    <button v-if="notificationSupported" :class="{sec: notificationsEnabled}" :disabled="notificationBusy || !pushServerReady"
+            @click="notificationsEnabled ? disableNotifications() : enableNotifications()">
+      {{ notificationBusy ? 'Attendi…' : notificationsEnabled ? 'Disattiva notifiche' : 'Attiva notifiche' }}
+    </button>
+  </div>
+
   <div class="card">
     <div class="row">
       <input v-model="idInput" placeholder="ID ordine" @keyup.enter="loadOrder(idInput)">

@@ -4,7 +4,7 @@ Piccolo sito web per consultare l'elenco e lo stato dei tuoi ordini tramite le A
 
 ## Requisiti
 
-- Node.js 18 o superiore (serve `fetch` nativo). Nessuna dipendenza da installare.
+- Node.js 18 o superiore (serve `fetch` nativo) e npm per installare le dipendenze.
 - Un token API CardTrader (Profilo CardTrader → Impostazioni).
 - Un browser moderno (Vue 3 viene caricato da CDN; serve una connessione al primo accesso).
 
@@ -21,6 +21,7 @@ Il token non va mai committato. Puoi fornirlo in uno di questi modi (in ordine d
 ## Avvio
 
 ```powershell
+npm install
 node server.js
 ```
 
@@ -34,9 +35,31 @@ Aprendo l'app in locale su `http://localhost:3000` (o pubblicandola su HTTPS), i
 
 L'interfaccia e Vue vengono memorizzati per consentire l'apertura offline dopo il primo caricamento. Le richieste `/api/` non vengono mai memorizzate: per aggiornare ordini e articoli è necessaria una connessione e il server Node deve essere in esecuzione.
 
+### Notifiche push
+
+Le notifiche richiedono che il server sia raggiungibile via HTTPS, chiavi VAPID e il permesso esplicito dell'utente. Installare l'app non attiva automaticamente le notifiche: apri l'app, premi **Attiva notifiche** e concedi il permesso. Su iPhone/iPad l'app deve essere aggiunta alla schermata Home con iOS/iPadOS 16.4 o successivi.
+
+Per l'ambiente locale, le chiavi VAPID sono salvate nel `.env` escluso da Git. Per configurare un altro server, genera una coppia:
+
+```powershell
+npx web-push generate-vapid-keys
+```
+
+Aggiungi le chiavi generate al file `.env` (non committarlo) e imposta un indirizzo di contatto valido:
+
+```dotenv
+VAPID_PUBLIC_KEY=chiave-pubblica-generata
+VAPID_PRIVATE_KEY=chiave-privata-generata
+VAPID_SUBJECT=mailto:tuo-indirizzo@example.com
+```
+
+Riavvia `node server.js`. Il server controlla CardTrader ogni minuto e avvisa quando cambia lo stato di un articolo già rilevato al controllo precedente. Le sottoscrizioni dei dispositivi e l'ultimo stato rilevato sono salvati in `push-data.json`, escluso da Git: conserva questo file e le chiavi VAPID per mantenere attive le registrazioni. Il server deve restare acceso e connesso a Internet perché i push arrivino anche con l'app chiusa.
+
+Non rigenerare le chiavi VAPID dopo aver registrato i dispositivi: le sottoscrizioni esistenti dipendono da quella coppia.
+
 ## Panoramica
 
-- `server.js`: server Node senza dipendenze. Serve `index.html` e fa da proxy: le richieste a `/api/*` vengono inoltrate a CardTrader aggiungendo l'header `Authorization: Bearer <token>`. Così il token resta lato server e si evitano problemi CORS.
+- `server.js`: server Node con la dipendenza web-push. Serve `index.html` e fa da proxy: le richieste a `/api/*` vengono inoltrate a CardTrader aggiungendo l'header `Authorization: Bearer <token>`. Così il token resta lato server e si evitano problemi CORS.
 - `index.html`, `style.css`, `app.js`: markup, stili e logica dell'interfaccia Vue 3 (CDN). Nella vista CT0 si può raggruppare (stato / chi spedisce), ordinare per vari campi in modo crescente o decrescente e comprimere i gruppi. Elenca gli ordini (`GET /orders?sort=date.desc`) e mostra il dettaglio di un ordine (`GET /orders/{id}`).
 - `card_trader_postman_collection.json`: collection Postman con gli endpoint di riferimento.
 
