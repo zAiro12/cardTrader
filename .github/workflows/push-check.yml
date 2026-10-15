@@ -1,0 +1,23 @@
+name: Controllo stati e notifiche
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Richiama il backend
+        env:
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$API_BASE_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "Imposta la variabile API_BASE_URL e il secret CRON_SECRET." >&2
+            exit 1
+          fi
+          curl --fail --silent --show-error --max-time 60 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "${API_BASE_URL%/}/api/push/check"

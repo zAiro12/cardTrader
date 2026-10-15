@@ -46,20 +46,50 @@ if (PUSH_ENABLED) {
   console.warn('Notifiche push disabilitate: configura VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY in .env.');
 }
 
-function loadPushData() {
-  if (!fs.existsSync(PUSH_DATA_FILE)) return { subscriptions: [], statuses: null };
-  const data = JSON.parse(fs.readFileSync(PUSH_DATA_FILE, 'utf8'));
-  if (!Array.isArray(data.subscriptions) ||
-      !(data.statuses === null || (typeof data.statuses === 'object' && !Array.isArray(data.statuses)))) {
-    throw new Error('push-data.json non ha un formato valido.');
+// Su Vercel il filesystem e' di sola lettura: con un database Redis REST (Upstash / Vercel KV) i dati vanno li'.
+const KV_URL = loadSetting('KV_REST_API_URL') || loadSetting('UPSTASH_REDIS_REST_URL');
+const KV_TOKEN = loadSetting('KV_REST_API_TOKEN') || loadSetting('UPSTASH_REDIS_REST_TOKEN');
+const KV_KEY = 'cardtrader:push-data';
+const CRON_SECRET = loadSetting('CRON_SECRET');
+
+async function kvCommand(command) {
+  const response = await fetch(KV_URL.replace(/\/+$/, ''), {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + KV_TOKEN, 'Content-Type': 'application/json' },
+    body: JSON.stringify(command),
+    signal: AbortSignal.timeout(10_000),
+  });
+  const result = await response.json();
+  if (!response.ok || result.error) throw new Error(result.error || `Database HTTP ${response.status}`);
+  return result.result;
+}
+
+function validPushData(data) {
+  return data && Array.isArray(data.subscriptions) &&
+    (data.statuses === null || (typeof data.statuses === 'object' && !Array.isArray(data.statuses)));
+}
+
+async function loadPushData() {
+  let data = null;
+  if (KV_URL && KV_TOKEN) {
+    const raw = await kvCommand(['GET', KV_KEY]);
+    if (raw) data = JSON.parse(raw);
+  } else if (fs.existsSync(PUSH_DATA_FILE)) {
+    data = JSON.parse(fs.readFileSync(PUSH_DATA_FILE, 'utf8'));
   }
+  if (!data) return { subscriptions: [], statuses: null };
+  if (!validPushData(data)) throw new Error('I dati delle notifiche non hanno un formato valido.');
   return data;
 }
 
-let pushData = loadPushData();
+let pushData = { subscriptions: [], statuses: null };
 let polling = false;
 
-function savePushData() {
+async function savePushData() {
+  if (KV_URL && KV_TOKEN) {
+    await kvCommand(['SET', KV_KEY, JSON.stringify(pushData)]);
+    return;
+  }
   const tempFile = PUSH_DATA_FILE + '.tmp';
   fs.writeFileSync(tempFile, JSON.stringify(pushData, null, 2), { mode: 0o600 });
   fs.renameSync(tempFile, PUSH_DATA_FILE);
@@ -121,9 +151,11 @@ const STATUS_LABELS = {
 };
 
 async function pollStatusChanges() {
-  if (!PUSH_ENABLED || polling || pushData.subscriptions.length === 0) return;
+  if (!PUSH_ENABLED || polling) return;
   polling = true;
   try {
+    pushData = await loadPushData();
+    if (pushData.subscriptions.length === 0) return;
     const response = await fetch(`${BASE}/ct0_box_items`, {
       headers: { Authorization: 'Bearer ' + TOKEN },
       signal: AbortSignal.timeout(20_000),
@@ -144,7 +176,7 @@ async function pollStatusChanges() {
 
     if (pushData.statuses === null) {
       pushData.statuses = current;
-      savePushData();
+      await savePushData();
       return;
     }
 
@@ -180,7 +212,7 @@ async function pollStatusChanges() {
     }
     if (changes.length || newItems || expiredEndpoints.size) {
       pushData.statuses = current;
-      savePushData();
+      await savePushData();
     }
   } catch (error) {
     console.error('Controllo notifiche CardTrader non riuscito:', error.message);
@@ -205,6 +237,16 @@ async function handler(req, res) {
   if (requestUrl.pathname.startsWith('/api/push/')) {
     if (requestUrl.pathname === '/api/push/config' && req.method === 'GET') {
       return sendJson(res, 200, { enabled: PUSH_ENABLED, publicKey: PUSH_ENABLED ? VAPID_PUBLIC_KEY : null });
+    }
+    if (requestUrl.pathname === '/api/push/check' && req.method === 'GET') {
+      const crypto = require('crypto');
+      const given = Buffer.from(req.headers.authorization || '');
+      const expected = Buffer.from(`Bearer ${CRON_SECRET}`);
+      if (!CRON_SECRET || given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) {
+        return sendJson(res, 401, { error: 'Non autorizzato.' });
+      }
+      await pollStatusChanges();
+      return sendJson(res, 200, { ok: true });
     }
     if (requestUrl.pathname === '/api/push/subscribe' && req.method === 'POST') {
       if (!PUSH_ENABLED) return sendJson(res, 503, { error: 'Le notifiche push non sono configurate sul server.' });
@@ -231,10 +273,11 @@ async function handler(req, res) {
         if (endpoint.protocol !== 'https:' || endpoint.port || !allowedHost) {
           return sendJson(res, 400, { error: 'Provider notifiche non supportato.' });
         }
+        pushData = await loadPushData();
         pushData.subscriptions = pushData.subscriptions.filter(s => s.endpoint !== subscription.endpoint);
         pushData.subscriptions.push(subscription);
-        savePushData();
-        if (pushData.statuses === null) setImmediate(pollStatusChanges);
+        await savePushData();
+        if (pushData.statuses === null) await pollStatusChanges();
         return sendJson(res, 201, { ok: true });
       } catch (error) {
         console.error('Salvataggio sottoscrizione push non riuscito:', error.message);
@@ -249,8 +292,9 @@ async function handler(req, res) {
       try {
         const { endpoint } = await readJson(req);
         if (typeof endpoint !== 'string') return sendJson(res, 400, { error: 'Endpoint non valido.' });
+        pushData = await loadPushData();
         pushData.subscriptions = pushData.subscriptions.filter(s => s.endpoint !== endpoint);
-        savePushData();
+        await savePushData();
         return sendJson(res, 200, { ok: true });
       } catch (error) {
         console.error('Rimozione sottoscrizione push non riuscita:', error.message);
