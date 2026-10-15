@@ -1,5 +1,6 @@
 Vue.createApp({
   data: () => ({ orders: [], order: null, idInput: '', error: '', loading: false, lastUpdate: '',
+    canInstall: false, installPrompt: null,
     box: [], boxError: '', boxLoading: false, busy: false, boxLoaded: false,
     groupBy: '', filter: 'all', q: '', sort: 'paid', dir: -1, collapsed: {}, open: null,
     STATUSES: [
@@ -8,7 +9,24 @@ Vue.createApp({
       { key: 'arrived', label: 'Arrivato in box', color: '#16a34a' },
       { key: 'returned', label: 'Reso', color: '#6b7280' },
       { key: 'cancelled', label: 'Annullato', color: '#dc2626' }] }),
-  mounted() { this.loadList(); this.loadBox(); setInterval(() => this.loadBox(true), 5000); },
+  mounted() {
+    this.loadList();
+    this.loadBox();
+    setInterval(() => this.loadBox(true), 5000);
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js')
+        .catch(error => console.error('Registrazione della modalità offline non riuscita:', error));
+    }
+    window.addEventListener('beforeinstallprompt', event => {
+      event.preventDefault();
+      this.installPrompt = event;
+      this.canInstall = true;
+    });
+    window.addEventListener('appinstalled', () => {
+      this.installPrompt = null;
+      this.canInstall = false;
+    });
+  },
   computed: {
     counts() { const c = {}; this.box.forEach(b => { const k = this.st(b).key; c[k] = (c[k] || 0) + 1; }); return c; },
     totalValue() {
@@ -54,6 +72,13 @@ Vue.createApp({
     }
   },
   methods: {
+    async installApp() {
+      if (!this.installPrompt) return;
+      await this.installPrompt.prompt();
+      await this.installPrompt.userChoice;
+      this.installPrompt = null;
+      this.canInstall = false;
+    },
     st(b) {
       const k = b.cancelled_at ? 'cancelled' : b.return_to_seller ? 'returned' : b.arrived_at ? 'arrived'
         : b.presale ? 'presale' : 'incoming';

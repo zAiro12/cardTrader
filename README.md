@@ -6,7 +6,7 @@ Piccolo sito web per consultare l'elenco e lo stato dei tuoi ordini tramite le A
 
 - Node.js 18 o superiore (serve `fetch` nativo). Nessuna dipendenza da installare.
 - Un token API CardTrader (Profilo CardTrader → Impostazioni).
-- Un browser moderno (Vue 3 viene caricato da CDN, serve quindi connessione internet).
+- Un browser moderno (Vue 3 viene caricato da CDN; serve una connessione al primo accesso).
 
 ## Configurazione del token
 
@@ -27,6 +27,12 @@ node server.js
 Poi apri http://localhost:3000. Per cambiare porta: `$env:PORT=8080; node server.js`.
 
 Se il token manca il server si ferma con un messaggio di errore.
+
+## Installazione come PWA
+
+Aprendo l'app in locale su `http://localhost:3000` (o pubblicandola su HTTPS), il browser può installarla come app. Nei browser compatibili appare il pulsante **Installa app**; su iPhone/iPad usa **Condividi → Aggiungi alla schermata Home**.
+
+L'interfaccia e Vue vengono memorizzati per consentire l'apertura offline dopo il primo caricamento. Le richieste `/api/` non vengono mai memorizzate: per aggiornare ordini e articoli è necessaria una connessione e il server Node deve essere in esecuzione.
 
 ## Panoramica
 

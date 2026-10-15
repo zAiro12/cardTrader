@@ -4,12 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Stato ordini CardTrader</title>
+<meta name="description" content="Consulta lo stato degli ordini CardTrader e degli articoli CardTrader Zero.">
+<meta name="theme-color" content="#2563eb">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="app"><main>
-  <h1>Stato dei miei ordini</h1>
+  <div class="app-header">
+    <h1>Stato dei miei ordini</h1>
+    <button v-if="canInstall" @click="installApp">Installa app</button>
+  </div>
 
   <div class="card">
     <div class="row">
