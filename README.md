@@ -72,7 +72,7 @@ Il workflow [pages.yml](.github/workflows/pages.yml) pubblica l'interfaccia stat
 2. Settings → Secrets and variables → Actions → Variables: crea `API_BASE_URL` con l'URL del backend (es. `https://mio-backend.vercel.app`).
 3. Sul backend imposta `ALLOWED_ORIGIN` con l'origine di Pages (es. `https://utente.github.io`, senza percorso) e le variabili `CARDTRADER_TOKEN` e `VAPID_*`.
 
-Il workflow genera `config.js` con `API_BASE_URL`; in locale `config.js` resta vuoto e le API sono quelle dello stesso server.
+Il workflow genera `config.js` con `API_BASE_URL` e una versione build-time (`v.AAAA.MM.GG-HHMM (commit)`, in UTC) mostrata nel footer; in locale `config.js` resta con valori placeholder e le API sono quelle dello stesso server.
 
 ## Panoramica
 

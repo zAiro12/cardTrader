@@ -9,7 +9,8 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png?v=7">
+<link rel="apple-touch-icon-precomposed" sizes="180x180" href="apple-touch-icon.png?v=7">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="CardTrader">
 <meta name="mobile-web-app-capable" content="yes">
@@ -149,7 +150,10 @@
     <p v-else-if="!loading">Nessun ordine trovato.</p>
   </div>
 </main>
-<footer style="text-align:center;padding:12px;color:#888;font-size:13px">Ultimo aggiornamento: {{ lastUpdate || '—' }} · auto ogni 5s</footer></div>
+<footer class="site-footer">
+  <div>Ultimo aggiornamento: {{ lastUpdate || '—' }} · auto ogni 5s</div>
+  <div>Pubblicazione: {{ buildVersion || 'v.locale' }}</div>
+</footer></div>
 
 <script src="config.js"></script>
 <script src="main.js"></script>

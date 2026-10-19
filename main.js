@@ -1,7 +1,9 @@
 const API_BASE = ((window.APP_CONFIG && window.APP_CONFIG.apiBase) || '').replace(/\/+$/, '');
+const BUILD_VERSION = (window.APP_CONFIG && window.APP_CONFIG.buildVersion) || '';
 
 Vue.createApp({
   data: () => ({ orders: [], order: null, idInput: '', error: '', loading: false, lastUpdate: '',
+    buildVersion: BUILD_VERSION,
     canInstall: false, installPrompt: null,
     notificationSupported: 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window,
     notificationsEnabled: false, notificationBusy: false, notificationMessage: '', notificationError: false,
