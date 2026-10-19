@@ -30,7 +30,7 @@ jobs:
           fi
           mkdir _site
           cp index.html style.css main.js service-worker.js manifest.webmanifest icon.svg icon-192.png icon-512.png apple-touch-icon.png _site/
-          node -e "const now = new Date(); const p = n => String(n).padStart(2, '0'); const sha = (process.env.GITHUB_SHA || '').slice(0, 7) || 'local'; const v = `v.${now.getUTCFullYear()}.${p(now.getUTCMonth() + 1)}.${p(now.getUTCDate())}-${p(now.getUTCHours())}${p(now.getUTCMinutes())} (${sha})`; require('fs').writeFileSync('_site/config.js', 'window.APP_CONFIG = ' + JSON.stringify({ apiBase: process.env.API_BASE_URL, buildVersion: v }) + ';\n')"
+          node scripts/generate-config.js _site/config.js
           touch _site/.nojekyll
 
       - uses: actions/upload-pages-artifact@v3
