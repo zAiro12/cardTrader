@@ -223,6 +223,32 @@ async function pollStatusChanges() {
   }
 }
 
+// Notifica di prova ogni ora, attiva solo con PUSH_TEST_HOURLY=true; serve a verificare la ricezione in background.
+async function sendHourlyTest() {
+  if (!PUSH_ENABLED || !/^(1|true|yes)$/i.test(loadSetting('PUSH_TEST_HOURLY') || '')) return;
+  pushData = await loadPushData();
+  if (pushData.subscriptions.length === 0) return;
+  const now = Date.now();
+  if (now - (pushData.lastTest || 0) < 55 * 60_000) return;
+  const notification = JSON.stringify({
+    title: 'Notifica di prova',
+    body: `Controllo orario delle ${new Date(now).toLocaleTimeString('it-IT', { timeZone: 'Europe/Rome', hour: '2-digit', minute: '2-digit' })}: le notifiche in background funzionano.`,
+    tag: 'cardtrader-test',
+  });
+  const expired = new Set();
+  for (const subscription of pushData.subscriptions) {
+    try {
+      await webpush.sendNotification(subscription, notification, { TTL: 600 });
+    } catch (error) {
+      if (error.statusCode === 404 || error.statusCode === 410) expired.add(subscription.endpoint);
+      else console.error(`Notifica di prova non riuscita (HTTP ${error.statusCode || 'sconosciuto'}):`, error.message);
+    }
+  }
+  pushData.subscriptions = pushData.subscriptions.filter(s => !expired.has(s.endpoint));
+  pushData.lastTest = now;
+  await savePushData();
+}
+
 async function handler(req, res) {
   const requestUrl = new URL(req.url, 'http://localhost');
   if (!TOKEN) return sendJson(res, 500, { error: 'Token CardTrader non configurato sul server.' });
@@ -248,6 +274,11 @@ async function handler(req, res) {
         return sendJson(res, 401, { error: 'Non autorizzato.' });
       }
       await pollStatusChanges();
+      try {
+        await sendHourlyTest();
+      } catch (error) {
+        console.error('Notifica di prova non riuscita:', error.message);
+      }
       return sendJson(res, 200, { ok: true });
     }
     if (requestUrl.pathname === '/api/push/subscribe' && req.method === 'POST') {
