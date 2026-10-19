@@ -1,11 +1,11 @@
-// Genera config.js per la pubblicazione: URL del backend e versione di build.
+// Genera config.js per la pubblicazione: URL del backend e versione di build (ora italiana).
 const fs = require('fs');
 
-const pad = n => String(n).padStart(2, '0');
-const now = new Date();
-const stamp = `${now.getUTCFullYear()}.${pad(now.getUTCMonth() + 1)}.${pad(now.getUTCDate())}-${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}`;
-const sha = (process.env.GITHUB_SHA || '').slice(0, 7);
-const buildVersion = `v.${stamp}${sha ? ` (${sha})` : ''}`;
+const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+}).formatToParts(new Date()).map(part => [part.type, part.value]));
+const buildVersion = `v.${parts.year}.${parts.month}.${parts.day}-${parts.hour}${parts.minute}`;
 
 const config = { apiBase: process.env.API_BASE_URL || '', buildVersion };
 fs.writeFileSync(process.argv[2] || 'config.js', `window.APP_CONFIG = ${JSON.stringify(config)};\n`);

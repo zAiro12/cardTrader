@@ -33,7 +33,7 @@
   .tl i{flex:0 0 24px;height:2px;background:#cbd5e1}
   .tl .done{color:#166534;font-weight:600}.tl .cx{color:#b91c1c}
   pre{background:#0f172a;color:#e2e8f0;padding:10px;border-radius:6px;overflow:auto;max-height:300px}
-  .site-footer{text-align:center;padding:12px;color:#888;font-size:13px}
+  .site-footer{text-align:center;padding:12px;color:#888;font-size:13px;line-height:1.5}
   @media(max-width:600px){
     main{padding:12px}
     .app-header{align-items:flex-start;flex-wrap:wrap}
