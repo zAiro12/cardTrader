@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cardtrader-pwa-v8';
+const CACHE_NAME = 'cardtrader-pwa-v9';
 const BASE = new URL('./', self.location).pathname;
 const APP_SHELL = ['', 'index.html', 'style.css', 'config.js', 'main.js', 'manifest.webmanifest',
   'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'icon.svg'].map(file => BASE + file);
