@@ -2,6 +2,9 @@
 
 Piccolo sito web per consultare l'elenco e lo stato dei tuoi ordini tramite le API di CardTrader (`https://api.cardtrader.com/api/v2`). Permette anche di trovare l'ID di un ordine e vederne il dettaglio.
 
+[![Deploy to GitHub Pages](https://github.com/zAiro12/cardTrader/actions/workflows/pages.yml/badge.svg)](https://github.com/zAiro12/cardTrader/actions/workflows/pages.yml)
+[![Controllo stati e notifiche](https://github.com/zAiro12/cardTrader/actions/workflows/push-check.yml/badge.svg)](https://github.com/zAiro12/cardTrader/actions/workflows/push-check.yml)
+
 ## Requisiti
 
 - Node.js 18 o superiore (serve `fetch` nativo) e npm per installare le dipendenze.
