@@ -1,7 +1,7 @@
-const CACHE_NAME = 'cardtrader-pwa-v9';
+const CACHE_NAME = 'cardtrader-pwa-v10';
 const BASE = new URL('./', self.location).pathname;
 const APP_SHELL = ['', 'index.html', 'style.css', 'config.js', 'main.js', 'manifest.webmanifest',
-  'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'icon.svg'].map(file => BASE + file);
+  'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'app-icon-180.png', 'app-icon-192.png', 'app-icon-512.png', 'icon.svg'].map(file => BASE + file);
 const VUE_URL = 'https://unpkg.com/vue@3/dist/vue.global.prod.js';
 
 self.addEventListener('install', event => {
@@ -79,7 +79,7 @@ self.addEventListener('push', event => {
   }
   event.waitUntil(self.registration.showNotification(data.title || 'CardTrader', {
     body: data.body || 'Lo stato di un articolo è cambiato.',
-    icon: BASE + 'icon-192.png',
+    icon: BASE + 'app-icon-192.png',
     badge: BASE + 'icon-192.png',
     tag: data.tag || 'cardtrader-status',
   }));

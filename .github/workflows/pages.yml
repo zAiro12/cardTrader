@@ -29,7 +29,7 @@ jobs:
             exit 1
           fi
           mkdir _site
-          cp index.html style.css main.js service-worker.js manifest.webmanifest icon.svg icon-192.png icon-512.png apple-touch-icon.png _site/
+          cp index.html style.css main.js service-worker.js manifest.webmanifest icon.svg icon-192.png icon-512.png apple-touch-icon.png app-icon-180.png app-icon-192.png app-icon-512.png _site/
           node scripts/generate-config.js _site/config.js
           touch _site/.nojekyll
 
