@@ -58,6 +58,10 @@ VAPID_SUBJECT=mailto:tuo-indirizzo@example.com
 
 Riavvia `node server.js`. Il server controlla CardTrader ogni minuto e avvisa quando cambia lo stato di un articolo già rilevato al controllo precedente. Le sottoscrizioni dei dispositivi e l'ultimo stato rilevato sono salvati in `push-data.json`, escluso da Git: conserva questo file e le chiavi VAPID per mantenere attive le registrazioni. Il server deve restare acceso e connesso a Internet perché i push arrivino anche con l'app chiusa.
 
+Su Vercel il filesystem non è scrivibile: imposta `DATABASE_URL` (connection string Neon Postgres) e i dati vengono salvati
+nella tabella `app_state`, creata automaticamente. Imposta anche `CRON_SECRET` (uguale al secret GitHub omonimo) per
+`/api/push/check`, richiamato ogni 10 minuti dal workflow `push-check.yml`.
+
 Non rigenerare le chiavi VAPID dopo aver registrato i dispositivi: le sottoscrizioni esistenti dipendono da quella coppia.
 
 ## Pubblicazione su GitHub Pages

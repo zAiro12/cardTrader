@@ -3,6 +3,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const webpush = require('web-push');
+const { neon } = require('@neondatabase/serverless');
 
 const BASE = 'https://api.cardtrader.com/api/v2';
 const PUSH_DATA_FILE = path.join(__dirname, 'push-data.json');
@@ -46,22 +47,20 @@ if (PUSH_ENABLED) {
   console.warn('Notifiche push disabilitate: configura VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY in .env.');
 }
 
-// Su Vercel il filesystem e' di sola lettura: con un database Redis REST (Upstash / Vercel KV) i dati vanno li'.
-const KV_URL = loadSetting('KV_REST_API_URL') || loadSetting('UPSTASH_REDIS_REST_URL');
-const KV_TOKEN = loadSetting('KV_REST_API_TOKEN') || loadSetting('UPSTASH_REDIS_REST_TOKEN');
-const KV_KEY = 'cardtrader:push-data';
+// Su Vercel il filesystem e' di sola lettura: con DATABASE_URL (Neon Postgres) i dati vanno nel database.
+const DATABASE_URL = loadSetting('DATABASE_URL') || loadSetting('POSTGRES_URL');
+const STATE_KEY = 'push-data';
 const CRON_SECRET = loadSetting('CRON_SECRET');
+let sql = null;
+let tableReady = null;
 
-async function kvCommand(command) {
-  const response = await fetch(KV_URL.replace(/\/+$/, ''), {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + KV_TOKEN, 'Content-Type': 'application/json' },
-    body: JSON.stringify(command),
-    signal: AbortSignal.timeout(10_000),
-  });
-  const result = await response.json();
-  if (!response.ok || result.error) throw new Error(result.error || `Database HTTP ${response.status}`);
-  return result.result;
+function db() {
+  if (!sql) sql = neon(DATABASE_URL);
+  if (!tableReady) {
+    tableReady = sql`CREATE TABLE IF NOT EXISTS app_state (key TEXT PRIMARY KEY, value JSONB NOT NULL)`
+      .catch(error => { tableReady = null; throw error; });
+  }
+  return tableReady.then(() => sql);
 }
 
 function validPushData(data) {
@@ -71,9 +70,10 @@ function validPushData(data) {
 
 async function loadPushData() {
   let data = null;
-  if (KV_URL && KV_TOKEN) {
-    const raw = await kvCommand(['GET', KV_KEY]);
-    if (raw) data = JSON.parse(raw);
+  if (DATABASE_URL) {
+    const query = await db();
+    const rows = await query`SELECT value FROM app_state WHERE key = ${STATE_KEY}`;
+    if (rows.length) data = rows[0].value;
   } else if (fs.existsSync(PUSH_DATA_FILE)) {
     data = JSON.parse(fs.readFileSync(PUSH_DATA_FILE, 'utf8'));
   }
@@ -86,8 +86,10 @@ let pushData = { subscriptions: [], statuses: null };
 let polling = false;
 
 async function savePushData() {
-  if (KV_URL && KV_TOKEN) {
-    await kvCommand(['SET', KV_KEY, JSON.stringify(pushData)]);
+  if (DATABASE_URL) {
+    const query = await db();
+    const value = JSON.stringify(pushData);
+    await query`INSERT INTO app_state (key, value) VALUES (${STATE_KEY}, ${value}::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`;
     return;
   }
   const tempFile = PUSH_DATA_FILE + '.tmp';
