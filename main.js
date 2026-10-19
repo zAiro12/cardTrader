@@ -1,6 +1,9 @@
 const API_BASE = ((window.APP_CONFIG && window.APP_CONFIG.apiBase) || '').replace(/\/+$/, '');
 const BUILD_VERSION = (window.APP_CONFIG && window.APP_CONFIG.buildVersion) || '';
 
+const VIEW_KEY = 'cardtrader-view';
+const VIEW_FIELDS = ['filter', 'q', 'sort', 'dir', 'groupBy', 'collapsed'];
+
 Vue.createApp({
   data: () => ({ orders: [], order: null, idInput: '', error: '', loading: false, lastUpdate: '',
     buildVersion: BUILD_VERSION,
@@ -16,6 +19,16 @@ Vue.createApp({
       { key: 'arrived', label: 'Arrivato in box', color: '#16a34a' },
       { key: 'returned', label: 'Reso', color: '#6b7280' },
       { key: 'cancelled', label: 'Annullato', color: '#dc2626' }] }),
+  created() {
+    try {
+      const s = JSON.parse(localStorage.getItem(VIEW_KEY) || '{}');
+      VIEW_FIELDS.forEach(k => { if (s[k] !== undefined) this[k] = s[k]; });
+    } catch (e) { /* preferenze non valide: ignorate */ }
+    VIEW_FIELDS.forEach(k => this.$watch(k, () => {
+      const o = {}; VIEW_FIELDS.forEach(f => { o[f] = this[f]; });
+      try { localStorage.setItem(VIEW_KEY, JSON.stringify(o)); } catch (e) { /* storage non disponibile */ }
+    }, { deep: true }));
+  },
   mounted() {
     this.loadList();
     this.loadBox();
