@@ -22,7 +22,6 @@
       <img src="icon.svg" alt="" width="40" height="40">
       <h1>Stato dei miei ordini</h1>
     </div>
-    <a href="export.html"><button class="sec">Esporta carte</button></a>
     <button v-if="canInstall" @click="installApp">Installa app</button>
   </div>
 
@@ -44,8 +43,38 @@
       <input v-model="idInput" placeholder="ID ordine" @keyup.enter="loadOrder(idInput)">
       <button @click="loadOrder(idInput)">Cerca</button>
       <button class="sec" @click="loadList">Ricarica lista</button>
+      <button class="sec" @click="showExport = !showExport">{{ showExport ? 'Chiudi export' : 'Esporta carte' }}</button>
     </div>
     <p v-if="error" class="err">{{ error }}</p>
+  </div>
+
+  <div class="card" v-if="showExport">
+    <h2>Esporta carte</h2>
+    <div class="row">
+      <select v-model="exp.status">
+        <option value="all">Tutti gli stati</option>
+        <option v-for="s in STATUSES" :key="s.key" :value="s.key">{{ s.label }}</option>
+      </select>
+      <select v-model="exp.seller">
+        <option value="">Tutti i venditori</option>
+        <option v-for="s in sellers" :key="s" :value="s">{{ s }}</option>
+      </select>
+      <input v-model="exp.q" placeholder="Cerca nome, espansione…">
+    </div>
+    <div class="row" style="margin:8px 0">
+      <select v-model="exp.format">
+        <option value="text">Testo (2 Nome)</option>
+        <option value="csv">CSV</option>
+      </select>
+      <label><input type="checkbox" v-model="exp.withExp"> Includi espansione</label>
+      <label><input type="checkbox" v-model="exp.merge"> Unisci carte uguali</label>
+    </div>
+    <p>{{ exportRows.length }} righe · {{ exportTotal }} carte</p>
+    <textarea :value="exportOutput" readonly rows="14" style="width:100%;font-family:monospace"></textarea>
+    <div class="row">
+      <button @click="copyExport" :disabled="!exportRows.length">{{ exp.copied ? 'Copiato!' : 'Copia' }}</button>
+      <button class="sec" @click="downloadExport" :disabled="!exportRows.length">Scarica .{{ exp.format === 'csv' ? 'csv' : 'txt' }}</button>
+    </div>
   </div>
 
   <div class="card" v-if="order">

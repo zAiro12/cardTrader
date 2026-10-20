@@ -13,6 +13,8 @@ Vue.createApp({
     pushServerReady: false,
     box: [], boxError: '', boxLoading: false, busy: false, boxLoaded: false,
     groupBy: '', filter: 'all', q: '', sort: 'paid', dir: -1, collapsed: {}, open: null,
+    showExport: false,
+    exp: { status: 'all', seller: '', q: '', format: 'text', withExp: false, merge: true, copied: false },
     STATUSES: [
       { key: 'presale', label: 'Prevendita', color: '#7c3aed' },
       { key: 'incoming', label: 'In arrivo', color: '#d97706' },
@@ -72,6 +74,34 @@ Vue.createApp({
       if (this.groupBy === 'status')
         return this.STATUSES.filter(s => m.has(s.key)).map(s => mk(s.key, s.label, m.get(s.key)));
       return [...m].sort((a, b) => b[1].length - a[1].length).map(([k, v]) => mk(k, k, v));
+    },
+    sellers() {
+      return [...new Set(this.box.map(b => b.seller && b.seller.username).filter(Boolean))].sort();
+    },
+    exportRows() {
+      const e = this.exp, q = e.q.toLowerCase();
+      const out = this.box
+        .filter(b => (e.status === 'all' || this.st(b).key === e.status) &&
+          (!e.seller || (b.seller && b.seller.username) === e.seller) &&
+          (!q || [b.name, this.expName(b), b.seller && b.seller.username].join(' ').toLowerCase().includes(q)))
+        .map(b => ({ qty: this.qty(b), name: b.name || '', exp: this.expName(b) }));
+      if (!e.merge) return out;
+      const m = new Map();
+      out.forEach(r => {
+        const k = r.name + '|' + r.exp;
+        if (m.has(k)) m.get(k).qty += r.qty; else m.set(k, { ...r });
+      });
+      return [...m.values()];
+    },
+    exportTotal() { return this.exportRows.reduce((s, r) => s + r.qty, 0); },
+    exportOutput() {
+      const e = this.exp;
+      if (e.format === 'csv') {
+        const esc = v => `"${String(v).replace(/"/g, '""')}"`;
+        return [e.withExp ? 'quantity,name,expansion' : 'quantity,name',
+          ...this.exportRows.map(r => [r.qty, esc(r.name), ...(e.withExp ? [esc(r.exp)] : [])].join(','))].join('\n');
+      }
+      return this.exportRows.map(r => `${r.qty} ${r.name}${e.withExp && r.exp ? ` (${r.exp})` : ''}`).join('\n');
     },
     shown() {
       const q = this.q.toLowerCase();
@@ -196,6 +226,21 @@ Vue.createApp({
     },
     late(b) { return !b.arrived_at && !b.cancelled_at && !b.return_to_seller && b.estimated_arrived_at && new Date(b.estimated_arrived_at) < new Date(); },
     qty(b) { return b.quantity ? Object.values(b.quantity).reduce((a, n) => a + (+n || 0), 0) : 1; },
+    expName(b) { return ((b.expansion && b.expansion.name) || b.expansion || '').toString(); },
+    async copyExport() {
+      try {
+        await navigator.clipboard.writeText(this.exportOutput);
+        this.exp.copied = true; setTimeout(() => { this.exp.copied = false; }, 1500);
+      } catch (e) { this.error = 'Copia non riuscita: ' + e.message; }
+    },
+    downloadExport() {
+      const csv = this.exp.format === 'csv';
+      const blob = new Blob([this.exportOutput], { type: csv ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'carte.' + (csv ? 'csv' : 'txt');
+      a.click(); URL.revokeObjectURL(a.href);
+    },
     d(x) { return x ? new Date(x).toLocaleDateString('it-IT') : '—'; },
     toggle(id) { this.open = this.open === id ? null : id; },
     async api(path) {
