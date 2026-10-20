@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Esporta carte – CardTrader</title>
+<meta name="theme-color" content="#2563eb">
+<link rel="icon" href="app-icon-192.png" type="image/png" sizes="192x192">
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<link rel="stylesheet" href="style.css?v=8">
+</head>
+<body>
+<div id="app"><main>
+  <div class="app-header">
+    <div class="brand">
+      <img src="icon.svg" alt="" width="40" height="40">
+      <h1>Esporta carte</h1>
+    </div>
+    <a href="index.html"><button class="sec">← Ordini</button></a>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <select v-model="filter">
+        <option value="all">Tutti gli stati</option>
+        <option v-for="s in STATUSES" :key="s.key" :value="s.key">{{ s.label }}</option>
+      </select>
+      <select v-model="seller">
+        <option value="">Tutti i venditori</option>
+        <option v-for="s in sellers" :key="s" :value="s">{{ s }}</option>
+      </select>
+      <input v-model="q" placeholder="Cerca nome, espansione…">
+      <button class="sec" @click="reload" :disabled="loading">{{ loading ? 'Carico…' : 'Ricarica' }}</button>
+    </div>
+    <div class="row">
+      <select v-model="format">
+        <option value="text">Testo (2 Nome)</option>
+        <option value="csv">CSV</option>
+      </select>
+      <label><input type="checkbox" v-model="withExp"> Includi espansione</label>
+      <label><input type="checkbox" v-model="merge"> Unisci carte uguali</label>
+    </div>
+    <p v-if="error" class="err">{{ error }}</p>
+  </div>
+
+  <div class="card">
+    <p>{{ rows.length }} righe · {{ totalCards }} carte</p>
+    <textarea v-model="output" readonly rows="18" style="width:100%;font-family:monospace"></textarea>
+    <div class="row">
+      <button @click="copy" :disabled="!rows.length">{{ copied ? 'Copiato!' : 'Copia' }}</button>
+      <button class="sec" @click="download" :disabled="!rows.length">Scarica .{{ format === 'csv' ? 'csv' : 'txt' }}</button>
+    </div>
+  </div>
+</main></div>
+<script src="config.js"></script>
+<script>
+const API_BASE = ((window.APP_CONFIG && window.APP_CONFIG.apiBase) || '').replace(/\/+$/, '');
+Vue.createApp({
+  data: () => ({
+    box: [], loading: false, error: '', copied: false,
+    filter: 'all', seller: '', q: '', format: 'text', withExp: false, merge: true,
+    STATUSES: [
+      { key: 'presale', label: 'Prevendita' }, { key: 'incoming', label: 'In arrivo' },
+      { key: 'arrived', label: 'Arrivato in box' }, { key: 'returned', label: 'Reso' },
+      { key: 'cancelled', label: 'Annullato' }],
+  }),
+  mounted() { this.reload(); },
+  computed: {
+    sellers() {
+      return [...new Set(this.box.map(b => b.seller && b.seller.username).filter(Boolean))].sort();
+    },
+    rows() {
+      const q = this.q.toLowerCase();
+      const list = this.box.filter(b =>
+        (this.filter === 'all' || this.status(b) === this.filter) &&
+        (!this.seller || (b.seller && b.seller.username) === this.seller) &&
+        (!q || [b.name, this.exp(b), b.seller && b.seller.username].join(' ').toLowerCase().includes(q)));
+      const out = list.map(b => ({ qty: this.qty(b), name: b.name || '', exp: this.exp(b) }));
+      if (!this.merge) return out;
+      const m = new Map();
+      out.forEach(r => {
+        const k = r.name + '|' + r.exp;
+        if (m.has(k)) m.get(k).qty += r.qty; else m.set(k, { ...r });
+      });
+      return [...m.values()];
+    },
+    totalCards() { return this.rows.reduce((s, r) => s + r.qty, 0); },
+    output() {
+      if (this.format === 'csv') {
+        const esc = v => `"${String(v).replace(/"/g, '""')}"`;
+        const head = this.withExp ? 'quantity,name,expansion' : 'quantity,name';
+        return [head, ...this.rows.map(r =>
+          [r.qty, esc(r.name), ...(this.withExp ? [esc(r.exp)] : [])].join(','))].join('\n');
+      }
+      return this.rows.map(r => `${r.qty} ${r.name}${this.withExp && r.exp ? ` (${r.exp})` : ''}`).join('\n');
+    },
+  },
+  methods: {
+    status(b) {
+      return b.cancelled_at ? 'cancelled' : b.return_to_seller ? 'returned' : b.arrived_at ? 'arrived'
+        : b.presale ? 'presale' : 'incoming';
+    },
+    qty(b) { return b.quantity ? Object.values(b.quantity).reduce((a, n) => a + (+n || 0), 0) : 1; },
+    exp(b) { return ((b.expansion && b.expansion.name) || b.expansion || '').toString(); },
+    async reload() {
+      this.loading = true; this.error = '';
+      try {
+        const r = await fetch(API_BASE + '/api/ct0_box_items');
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(`Errore ${r.status}: ${j.errors || j.error || ''}`);
+        this.box = Array.isArray(j) ? j : (j.array || j.ct0_box_items || j.items || []);
+      } catch (e) { this.error = e.message; }
+      this.loading = false;
+    },
+    async copy() {
+      try {
+        await navigator.clipboard.writeText(this.output);
+        this.copied = true; setTimeout(() => { this.copied = false; }, 1500);
+      } catch (e) { this.error = 'Copia non riuscita: ' + e.message; }
+    },
+    download() {
+      const csv = this.format === 'csv';
+      const blob = new Blob([this.output], { type: csv ? 'text/csv;charset=utf-8' : 'text/plain;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'carte.' + (csv ? 'csv' : 'txt');
+      a.click(); URL.revokeObjectURL(a.href);
+    },
+  },
+}).mount('#app');
+</script>
+</body>
+</html>

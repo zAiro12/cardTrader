@@ -1,6 +1,6 @@
 const CACHE_NAME = 'cardtrader-pwa-v12';
 const BASE = new URL('./', self.location).pathname;
-const APP_SHELL = ['', 'index.html', 'style.css', 'config.js', 'main.js', 'manifest.webmanifest',
+const APP_SHELL = ['', 'index.html', 'export.html', 'style.css', 'config.js', 'main.js', 'manifest.webmanifest',
   'icon-192.png', 'icon-512.png', 'apple-touch-icon.png', 'app-icon-180.png', 'app-icon-192.png', 'app-icon-512.png', 'icon.svg'].map(file => BASE + file);
 const VUE_URL = 'https://unpkg.com/vue@3/dist/vue.global.prod.js';
 
