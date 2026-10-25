@@ -11,7 +11,7 @@ PWA per seguire lo stato dei tuoi ordini e degli articoli **CardTrader Zero** tr
 
 - Elenco ordini e dettaglio per ID (`/orders`, `/orders/{id}`).
 - Dashboard CardTrader Zero: stati *Prevendita, In arrivo (con flag In ritardo), Arrivato in box, Reso, Annullato*, conteggi e valore totale.
-- Ricerca, ordinamento (crescente/decrescente) e raggruppamento per stato o chi spedisce, con gruppi comprimibili.
+- Filtri per stato, rarità, espansione e colore mana, oltre a ricerca, ordinamento (crescente/decrescente) e raggruppamento per stato o chi spedisce, con gruppi comprimibili.
 - Filtri, ricerca, ordinamento e raggruppamento vengono **ricordati** alla riapertura dell'app (salvati nel browser).
 - PWA installabile (Android, desktop, iOS), apertura offline dell'interfaccia.
 - Notifiche push Web Push (VAPID), attivabili da più dispositivi.

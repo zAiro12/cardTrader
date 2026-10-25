@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="CardTrader">
 <meta name="mobile-web-app-capable" content="yes">
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-<link rel="stylesheet" href="style.css?v=8">
+<link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
 <div id="app"><main>
@@ -124,6 +124,20 @@
       </select>
       <button class="sec" @click="dir = -dir" :title="dir===1 ? 'Crescente' : 'Decrescente'">{{ dir === 1 ? '▲ Crescente' : '▼ Decrescente' }}</button>
     </div>
+    <div class="row filters" v-if="box.length" style="margin-bottom:8px">
+      <select v-model="rarityFilter">
+        <option value="">Tutte le rarità</option>
+        <option v-for="rarity in rarities" :key="rarity" :value="rarity">{{ rarity }}</option>
+      </select>
+      <select v-model="expansionFilter">
+        <option value="">Tutte le espansioni</option>
+        <option v-for="expansion in expansions" :key="expansion" :value="expansion">{{ expansion }}</option>
+      </select>
+      <select v-model="colorFilter">
+        <option value="">Tutti i colori</option>
+        <option v-for="color in COLORS" :key="color.key" :value="color.key">{{ color.label }}</option>
+      </select>
+    </div>
     <div class="row" v-if="box.length" style="margin-bottom:8px">
       <strong>Raggruppa per:</strong>
       <button :class="{sec: groupBy!==''}" @click="groupBy=''">Nessuno</button>
@@ -140,7 +154,9 @@
     <div class="item" v-for="b in (groupBy && collapsed[g.key] ? [] : g.items)" :key="b.id" @click="toggle(b.id)">
       <div class="top">
         <div><strong>{{ b.name }}</strong>
-          <small> · {{ b.expansion }} <template v-if="b.quantity">· {{ qty(b) }}×</template>
+          <small> · {{ expName(b) }} <template v-if="rarityName(b)">· {{ rarityName(b) }}</template>
+            <template v-if="cardColors(b).length">· {{ cardColors(b).map(colorLabel).join(', ') }}</template>
+            <template v-if="b.quantity">· {{ qty(b) }}×</template>
             <template v-if="b.properties && b.properties.mtg_foil"> · Foil</template>
             <template v-if="b.properties && b.properties.condition"> · {{ b.properties.condition }}</template></small></div>
         <div><span class="pill" :style="{background:st(b).color}">{{ st(b).label }}</span>

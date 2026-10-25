@@ -2,7 +2,10 @@ const API_BASE = ((window.APP_CONFIG && window.APP_CONFIG.apiBase) || '').replac
 const BUILD_VERSION = (window.APP_CONFIG && window.APP_CONFIG.buildVersion) || '';
 
 const VIEW_KEY = 'cardtrader-view';
-const VIEW_FIELDS = ['filter', 'q', 'sort', 'dir', 'groupBy', 'collapsed'];
+const VIEW_FIELDS = [
+  'filter', 'q', 'sort', 'dir', 'groupBy', 'collapsed',
+  'rarityFilter', 'expansionFilter', 'colorFilter',
+];
 
 Vue.createApp({
   data: () => ({ orders: [], order: null, idInput: '', error: '', loading: false, lastUpdate: '',
@@ -13,8 +16,17 @@ Vue.createApp({
     pushServerReady: false,
     box: [], boxError: '', boxLoading: false, busy: false, boxLoaded: false,
     groupBy: '', filter: 'all', q: '', sort: 'paid', dir: -1, collapsed: {}, open: null,
+    rarityFilter: '', expansionFilter: '', colorFilter: '',
     showExport: false,
     exp: { status: 'all', seller: '', q: '', format: 'text', withExp: false, merge: true, copied: false },
+    COLORS: [
+      { key: 'red', label: 'Rosso' },
+      { key: 'blue', label: 'Blu' },
+      { key: 'green', label: 'Verde' },
+      { key: 'white', label: 'Bianco' },
+      { key: 'black', label: 'Nero' },
+      { key: 'colorless', label: 'Incolore' },
+    ],
     STATUSES: [
       { key: 'presale', label: 'Prevendita', color: '#7c3aed' },
       { key: 'incoming', label: 'In arrivo', color: '#d97706' },
@@ -78,6 +90,14 @@ Vue.createApp({
     sellers() {
       return [...new Set(this.box.map(b => b.seller && b.seller.username).filter(Boolean))].sort();
     },
+    rarities() {
+      return [...new Set(this.box.map(b => this.rarityName(b)).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, 'it'));
+    },
+    expansions() {
+      return [...new Set(this.box.map(b => this.expName(b)).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, 'it'));
+    },
     exportRows() {
       const e = this.exp, q = e.q.toLowerCase();
       const out = this.box
@@ -106,14 +126,18 @@ Vue.createApp({
     shown() {
       const q = this.q.toLowerCase();
       let l = this.box.filter(b => (this.filter === 'all' || this.st(b).key === this.filter) &&
-        (!q || [b.name, b.expansion, b.seller && b.seller.username].join(' ').toLowerCase().includes(q)));
+        (!this.rarityFilter || this.rarityName(b) === this.rarityFilter) &&
+        (!this.expansionFilter || this.expName(b) === this.expansionFilter) &&
+        (!this.colorFilter || this.cardColors(b).includes(this.colorFilter)) &&
+        (!q || [b.name, this.expName(b), this.rarityName(b), b.seller && b.seller.username]
+          .join(' ').toLowerCase().includes(q)));
       const s = this.sort, dir = this.dir;
       const t = x => (x ? new Date(x).getTime() : null);
       const order = k => this.STATUSES.findIndex(x => x.key === k);
       const val = b =>
         s === 'name' ? (b.name || '').toLowerCase() :
         s === 'seller' ? ((b.seller && b.seller.username) || '').toLowerCase() :
-        s === 'exp' ? (b.expansion && b.expansion.name || b.expansion || '').toString().toLowerCase() :
+        s === 'exp' ? this.expName(b).toLowerCase() :
         s === 'price' ? ((b.buyer_price && b.buyer_price.cents) || 0) :
         s === 'qty' ? this.qty(b) :
         s === 'status' ? order(this.st(b).key) :
@@ -226,7 +250,62 @@ Vue.createApp({
     },
     late(b) { return !b.arrived_at && !b.cancelled_at && !b.return_to_seller && b.estimated_arrived_at && new Date(b.estimated_arrived_at) < new Date(); },
     qty(b) { return b.quantity ? Object.values(b.quantity).reduce((a, n) => a + (+n || 0), 0) : 1; },
-    expName(b) { return ((b.expansion && b.expansion.name) || b.expansion || '').toString(); },
+    expName(b) {
+      const blueprint = b.blueprint || b.card || {};
+      const expansion = b.expansion || blueprint.expansion;
+      return ((expansion && expansion.name) || expansion || b.expansion_name || blueprint.expansion_name || '').toString();
+    },
+    rarityName(b) {
+      const sources = [b, b.blueprint, b.card, b.properties].filter(value => value && typeof value === 'object');
+      for (const source of sources) {
+        const value = source.rarity || source.rarity_name || source.mtg_rarity;
+        if (value) return (value.name || value).toString();
+      }
+      return '';
+    },
+    cardColors(b) {
+      const sources = [b, b.blueprint, b.card, b.properties].filter(value => value && typeof value === 'object');
+      let raw;
+      for (const source of sources) {
+        for (const key of ['colors', 'mana_colors', 'mtg_colors', 'color_identity', 'color', 'mana_color', 'mtg_color']) {
+          if (source[key] !== undefined && source[key] !== null) {
+            raw = source[key];
+            break;
+          }
+        }
+        if (raw !== undefined) break;
+      }
+      if (raw === undefined) return [];
+
+      const values = [];
+      const collect = value => {
+        if (Array.isArray(value)) {
+          value.forEach(collect);
+        } else if (value && typeof value === 'object') {
+          if (value.name || value.value) collect(value.name || value.value);
+          else Object.entries(value).forEach(([key, enabled]) => { if (enabled) collect(key); });
+        } else if (typeof value === 'string') {
+          value.split(/[,/|;]/).forEach(part => values.push(part.trim().toLowerCase()));
+        }
+      };
+      collect(raw);
+
+      const aliases = {
+        r: 'red', rosso: 'red', red: 'red',
+        u: 'blue', blu: 'blue', blue: 'blue',
+        g: 'green', verde: 'green', green: 'green',
+        w: 'white', bianco: 'white', white: 'white',
+        b: 'black', nero: 'black', black: 'black',
+        c: 'colorless', incolore: 'colorless', colorless: 'colorless',
+      };
+      const colors = [...new Set(values.map(value => aliases[value]).filter(Boolean))];
+      if (colors.length) return colors;
+      return Array.isArray(raw) && raw.length === 0 ? ['colorless'] : [];
+    },
+    colorLabel(key) {
+      const color = this.COLORS.find(item => item.key === key);
+      return color ? color.label : '';
+    },
     async copyExport() {
       try {
         await navigator.clipboard.writeText(this.exportOutput);

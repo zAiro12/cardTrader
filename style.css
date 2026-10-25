@@ -10,6 +10,7 @@
   .notifications p:last-child{margin-bottom:0}
   .card{background:#fff;border-radius:8px;padding:16px;margin-bottom:16px;box-shadow:0 1px 3px #0002}
   .row{display:flex;gap:8px}
+  .filters select{flex:1;min-width:140px}
   input{flex:1;padding:8px;border:1px solid #ccc;border-radius:6px;min-height:40px}
   button{padding:8px 14px;border:0;border-radius:6px;background:#2563eb;color:#fff;cursor:pointer;min-height:40px}
   button.sec{background:#64748b}
