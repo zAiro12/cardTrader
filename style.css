@@ -28,6 +28,11 @@
   .ghead{margin:16px 0 8px;padding-bottom:4px;border-bottom:2px solid #e2e8f0}
   .item:hover{background:#fafcff}
   .top{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .mana-cost{display:inline-flex;vertical-align:middle;gap:2px;margin:0 3px}
+  .mana-symbol,.mana-symbol-text{display:inline-flex;flex:none;width:20px;height:20px;align-items:center;justify-content:center}
+  .mana-symbol{background-image:url("Mana.svg");background-size:209px 146px}
+  .mana-symbol-text{border:1px solid #64748b;border-radius:50%;background:#e2e8f0;color:#222;font-size:10px;font-weight:700;line-height:1}
+  .rarity-code{display:inline-block;margin:0 3px;padding:1px 5px;border-radius:5px;background:#e2e8f0;color:#334155;font-size:.75em;font-weight:700;vertical-align:middle}
   .pill{color:#fff;padding:2px 9px;border-radius:10px;font-size:.78em;margin-right:4px}
   .pill.late{background:#dc2626}
   .tl{display:flex;align-items:center;gap:6px;margin-top:8px;font-size:.8em;color:#94a3b8;flex-wrap:wrap}

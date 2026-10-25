@@ -257,11 +257,53 @@ Vue.createApp({
     },
     rarityName(b) {
       const sources = [b, b.blueprint, b.card, b.properties].filter(value => value && typeof value === 'object');
+      const cardType = sources.map(source => source.type_line || source.card_type || source.mtg_type || source.type || '')
+        .join(' ').toLowerCase();
+      if (/\bland\b/.test(cardType)) return 'L';
       for (const source of sources) {
         const value = source.rarity || source.rarity_name || source.mtg_rarity;
-        if (value) return (value.name || value).toString();
+        if (value) {
+          const rarity = (value.name || value).toString().trim().toLowerCase();
+          if (/\bland\b/.test(rarity)) return 'L';
+          if (rarity === 'common') return 'C';
+          if (rarity === 'uncommon') return 'U';
+          if (rarity === 'rare') return 'R';
+          if (rarity === 'mythic' || rarity === 'mythic rare' || rarity === 'mythicrare') return 'M';
+          return (value.name || value).toString();
+        }
       }
       return '';
+    },
+    rarityLabel(b) {
+      return ({ C: 'Common', U: 'Uncommon', R: 'Rara', M: 'Mythic', L: 'Land' })[this.rarityName(b)] || this.rarityName(b);
+    },
+    manaSymbols(b) {
+      const sources = [b.blueprint, b.card, b.properties, b].filter(value => value && typeof value === 'object');
+      let cost;
+      for (const source of sources) {
+        for (const key of ['mana_cost', 'mtg_mana_cost', 'manaCost', 'casting_cost', 'castingCost']) {
+          if (source[key] !== undefined && source[key] !== null && source[key] !== '') {
+            cost = source[key];
+            break;
+          }
+        }
+        if (cost !== undefined) break;
+      }
+      if (Array.isArray(cost)) cost = cost.map(value =>
+        value && typeof value === 'object' ? value.value || value.name || value.symbol || '' : value).join('');
+      else if (cost && typeof cost === 'object') cost = cost.value || cost.name || cost.symbol || '';
+      if (typeof cost !== 'string') return [];
+
+      const tokens = cost.match(/\{([^}]+)\}|10|[0-9]+|[WUBRGCXYZT]/gi) || [];
+      const positions = { W: '-84px -42px', U: '-105px -42px', B: '-126px -42px',
+        R: '-147px -42px', G: '-168px -42px', C: '-21px -42px' };
+      return tokens.map((raw, index) => {
+        const token = (raw[0] === '{' ? raw.slice(1, -1) : raw).toUpperCase();
+        const number = /^\d+$/.test(token) ? Number(token) : null;
+        const position = number !== null && number <= 10 ? `${number * -21}px 0` :
+          (token.length === 1 ? positions[token] : null);
+        return { key: `${index}-${token}`, label: token, position };
+      });
     },
     cardColors(b) {
       const sources = [b, b.blueprint, b.card, b.properties].filter(value => value && typeof value === 'object');

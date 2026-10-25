@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-title" content="CardTrader">
 <meta name="mobile-web-app-capable" content="yes">
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-<link rel="stylesheet" href="style.css?v=9">
+<link rel="stylesheet" href="style.css?v=10">
 </head>
 <body>
 <div id="app"><main>
@@ -90,7 +90,17 @@
     <table v-if="order.order_items && order.order_items.length">
       <tr v-for="i in order.order_items" :key="i.id">
         <td>{{ i.quantity }}×</td>
-        <td>{{ i.name || i.blueprint_name || i.blueprint_id }}</td>
+        <td>
+          {{ i.name || i.blueprint_name || i.blueprint_id }}
+          <span v-if="manaSymbols(i).length" class="mana-cost" :aria-label="'Costo di mana: ' + manaSymbols(i).map(symbol => symbol.label).join(' ')">
+            <template v-for="symbol in manaSymbols(i)" :key="symbol.key">
+              <span v-if="symbol.position" class="mana-symbol" :style="{backgroundPosition: symbol.position}"
+                    :title="symbol.label" role="img" :aria-label="symbol.label"></span>
+              <span v-else class="mana-symbol-text" :title="symbol.label">{{ symbol.label }}</span>
+            </template>
+          </span>
+          <span v-if="rarityName(i)" class="rarity-code" :title="rarityLabel(i)">{{ rarityName(i) }}</span>
+        </td>
         <td>{{ money(i.price) }}</td>
       </tr>
     </table>
@@ -154,7 +164,15 @@
     <div class="item" v-for="b in (groupBy && collapsed[g.key] ? [] : g.items)" :key="b.id" @click="toggle(b.id)">
       <div class="top">
         <div><strong>{{ b.name }}</strong>
-          <small> · {{ expName(b) }} <template v-if="rarityName(b)">· {{ rarityName(b) }}</template>
+          <span v-if="manaSymbols(b).length" class="mana-cost" :aria-label="'Costo di mana: ' + manaSymbols(b).map(symbol => symbol.label).join(' ')">
+            <template v-for="symbol in manaSymbols(b)" :key="symbol.key">
+              <span v-if="symbol.position" class="mana-symbol" :style="{backgroundPosition: symbol.position}"
+                    :title="symbol.label" role="img" :aria-label="symbol.label"></span>
+              <span v-else class="mana-symbol-text" :title="symbol.label">{{ symbol.label }}</span>
+            </template>
+          </span>
+          <span v-if="rarityName(b)" class="rarity-code" :title="rarityLabel(b)">{{ rarityName(b) }}</span>
+          <small> · {{ expName(b) }}
             <template v-if="cardColors(b).length">· {{ cardColors(b).map(colorLabel).join(', ') }}</template>
             <template v-if="b.quantity">· {{ qty(b) }}×</template>
             <template v-if="b.properties && b.properties.mtg_foil"> · Foil</template>
