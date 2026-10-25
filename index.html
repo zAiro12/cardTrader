@@ -153,6 +153,8 @@
       <button :class="{sec: groupBy!==''}" @click="groupBy=''">Nessuno</button>
       <button :class="{sec: groupBy!=='status'}" @click="groupBy='status'">Stato</button>
       <button :class="{sec: groupBy!=='seller'}" @click="groupBy='seller'">Chi spedisce</button>
+      <button :class="{sec: groupBy!=='rarity'}" @click="groupBy='rarity'">Rarità</button>
+      <button :class="{sec: groupBy!=='color'}" @click="groupBy='color'">Colore mana</button>
       <template v-if="groupBy">
         <button class="sec" @click="groups.forEach(g => collapsed[g.key] = true)">Comprimi tutto</button>
         <button class="sec" @click="collapsed = {}">Espandi tutto</button>

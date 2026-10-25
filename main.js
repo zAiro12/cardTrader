@@ -82,12 +82,25 @@ Vue.createApp({
       if (!this.groupBy) return [mk('all', '', this.shown)];
       const m = new Map();
       this.shown.forEach(b => {
-        const k = this.groupBy === 'status' ? this.st(b).key : ((b.seller && b.seller.username) || 'Sconosciuto');
+        const k = this.groupBy === 'status' ? this.st(b).key
+          : this.groupBy === 'rarity' ? (this.rarityName(b) || '?')
+          : this.groupBy === 'color' ? this.colorGroup(b)
+          : ((b.seller && b.seller.username) || 'Sconosciuto');
         if (!m.has(k)) m.set(k, []);
         m.get(k).push(b);
       });
       if (this.groupBy === 'status')
         return this.STATUSES.filter(s => m.has(s.key)).map(s => mk(s.key, s.label, m.get(s.key)));
+      if (this.groupBy === 'rarity') {
+        const names = { C: 'Common (C)', U: 'Uncommon (U)', R: 'Rara (R)', M: 'Mythic (M)', L: 'Land (L)', '?': 'Sconosciuta' };
+        return ['C', 'U', 'R', 'M', 'L', '?', ...[...m.keys()].filter(k => !names[k])]
+          .filter(k => m.has(k)).map(k => mk(k, names[k] || k, m.get(k)));
+      }
+      if (this.groupBy === 'color') {
+        const order = [...this.COLORS.map(c => c.key), 'multicolor', 'land'];
+        const label = k => k === 'multicolor' ? 'Multicolore' : k === 'land' ? 'Terre' : this.colorLabel(k);
+        return order.filter(k => m.has(k)).map(k => mk(k, label(k), m.get(k)));
+      }
       return [...m].sort((a, b) => b[1].length - a[1].length).map(([k, v]) => mk(k, k, v));
     },
     sellers() {
@@ -358,7 +371,7 @@ Vue.createApp({
       const sources = [b, b.blueprint, b.card, b.properties].filter(value => value && typeof value === 'object');
       let raw;
       for (const source of sources) {
-        for (const key of ['colors', 'mana_colors', 'mtg_colors', 'color_identity', 'color', 'mana_color', 'mtg_color']) {
+        for (const key of ['colors', 'mana_colors', 'mtg_colors', 'mtg_card_colors', 'color_identity', 'color', 'mana_color', 'mtg_color']) {
           if (source[key] !== undefined && source[key] !== null) {
             raw = source[key];
             break;
@@ -376,7 +389,11 @@ Vue.createApp({
           if (value.name || value.value) collect(value.name || value.value);
           else Object.entries(value).forEach(([key, enabled]) => { if (enabled) collect(key); });
         } else if (typeof value === 'string') {
-          value.split(/[,/|;]/).forEach(part => values.push(part.trim().toLowerCase()));
+          value.split(/[,/|;]/).forEach(part => {
+            const p = part.trim().toLowerCase();
+            if (/^[wubrgc]{2,5}$/.test(p)) values.push(...p);
+            else values.push(p);
+          });
         }
       };
       collect(raw);
@@ -392,6 +409,11 @@ Vue.createApp({
       const colors = [...new Set(values.map(value => aliases[value]).filter(Boolean))];
       if (colors.length) return colors;
       return Array.isArray(raw) && raw.length === 0 ? ['colorless'] : [];
+    },
+    colorGroup(b) {
+      if (this.rarityName(b) === 'L') return 'land';
+      const colors = this.cardColors(b);
+      return colors.length > 1 ? 'multicolor' : colors[0] || 'colorless';
     },
     colorLabel(key) {
       const color = this.COLORS.find(item => item.key === key);
