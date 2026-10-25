@@ -2,6 +2,7 @@ const API_BASE = ((window.APP_CONFIG && window.APP_CONFIG.apiBase) || '').replac
 const BUILD_VERSION = (window.APP_CONFIG && window.APP_CONFIG.buildVersion) || '';
 
 const VIEW_KEY = 'cardtrader-view';
+const CARD_CACHE_KEY = 'cardtrader-scryfall-v1';
 const VIEW_FIELDS = [
   'filter', 'q', 'sort', 'dir', 'groupBy', 'collapsed',
   'rarityFilter', 'expansionFilter', 'colorFilter',
@@ -15,6 +16,7 @@ Vue.createApp({
     notificationsEnabled: false, notificationBusy: false, notificationMessage: '', notificationError: false,
     pushServerReady: false,
     box: [], boxError: '', boxLoading: false, busy: false, boxLoaded: false,
+    cardInfo: {}, cardInfoLoading: false,
     groupBy: '', filter: 'all', q: '', sort: 'paid', dir: -1, collapsed: {}, open: null,
     rarityFilter: '', expansionFilter: '', colorFilter: '',
     showExport: false,
@@ -34,6 +36,7 @@ Vue.createApp({
       { key: 'returned', label: 'Reso', color: '#6b7280' },
       { key: 'cancelled', label: 'Annullato', color: '#dc2626' }] }),
   created() {
+    try { this.cardInfo = JSON.parse(localStorage.getItem(CARD_CACHE_KEY) || '{}') || {}; } catch (e) { /* cache non valida: ignorata */ }
     try {
       const s = JSON.parse(localStorage.getItem(VIEW_KEY) || '{}');
       VIEW_FIELDS.forEach(k => { if (s[k] !== undefined) this[k] = s[k]; });
@@ -257,9 +260,10 @@ Vue.createApp({
     },
     rarityName(b) {
       const sources = [b, b.blueprint, b.card, b.properties].filter(value => value && typeof value === 'object');
-      const cardType = sources.map(source => source.type_line || source.card_type || source.mtg_type || source.type || '')
+      const info = this.cardInfo[b.scryfall_id] || {};
+      const cardType = [info.type, ...sources.map(source => source.type_line || source.card_type || source.mtg_type || source.type || '')]
         .join(' ').toLowerCase();
-      if (/\bland\b/.test(cardType)) return 'L';
+      if (/\bland\b/.test(cardType) || (b.properties && b.properties.mtg_card_colors === 'L')) return 'L';
       for (const source of sources) {
         const value = source.rarity || source.rarity_name || source.mtg_rarity;
         if (value) {
@@ -277,10 +281,60 @@ Vue.createApp({
     rarityLabel(b) {
       return ({ C: 'Common', U: 'Uncommon', R: 'Rara', M: 'Mythic', L: 'Land' })[this.rarityName(b)] || this.rarityName(b);
     },
+    async loadCardInfo() {
+      if (this.cardInfoLoading) return;
+      const ids = [...new Set(this.box.map(b => b.scryfall_id).filter(id => id && !this.cardInfo[id]))];
+      if (!ids.length) return;
+      this.cardInfoLoading = true;
+      try {
+        const info = { ...this.cardInfo };
+        for (let i = 0; i < ids.length; i += 75) {
+          const r = await fetch('https://api.scryfall.com/cards/collection', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({ identifiers: ids.slice(i, i + 75).map(id => ({ id })) }),
+          });
+          if (!r.ok) throw new Error('Scryfall ' + r.status);
+          const j = await r.json();
+          (j.data || []).forEach(card => {
+            const face = (card.card_faces || [])[0] || {};
+            info[card.id] = { mana: card.mana_cost || face.mana_cost || '', type: card.type_line || face.type_line || '' };
+          });
+          (j.not_found || []).forEach(card => { if (card.id) info[card.id] = { mana: '', type: '' }; });
+          if (i + 75 < ids.length) await new Promise(resolve => setTimeout(resolve, 150));
+        }
+        this.cardInfo = info;
+        try { localStorage.setItem(CARD_CACHE_KEY, JSON.stringify(info)); } catch (e) { /* storage non disponibile */ }
+      } catch (e) { console.warn('Costo di mana non disponibile:', e); }
+      this.cardInfoLoading = false;
+    },
+    // Posizione del simbolo nella tavola Mana.svg (celle da 105px, scala 0.2 → passo 21px)
+    manaSprite(token) {
+      const pos = (col, row) => `${col * -21}px ${row * -21}px`;
+      const colors = 'WUBRG';
+      const hybrids = ['W/U', 'W/B', 'U/B', 'U/R', 'B/R', 'B/G', 'R/W', 'R/G', 'G/W', 'G/U'];
+      if (/^\d+$/.test(token)) {
+        const n = Number(token);
+        if (n <= 9) return pos(n, 0);
+        if (n <= 19) return pos(n - 10, 1);
+        return n === 20 ? pos(0, 2) : null;
+      }
+      if (token.length === 1 && 'XYZ'.includes(token)) return pos('XYZ'.indexOf(token) + 1, 2);
+      if (token.length === 1 && colors.includes(token)) return pos(colors.indexOf(token) + 4, 2);
+      if (token === 'S') return pos(9, 2);
+      let hybrid = hybrids.indexOf(token);
+      if (hybrid < 0) hybrid = hybrids.indexOf(token.split('/').reverse().join('/'));
+      if (hybrid >= 0) return pos(hybrid, 3);
+      const twoColor = /^2\/([WUBRG])$/.exec(token);
+      if (twoColor) return pos(colors.indexOf(twoColor[1]), 4);
+      const phyrexian = /^([WUBRG])\/P$/.exec(token);
+      if (phyrexian) return pos(colors.indexOf(phyrexian[1]) + 5, 4);
+      return null;
+    },
     manaSymbols(b) {
       const sources = [b.blueprint, b.card, b.properties, b].filter(value => value && typeof value === 'object');
-      let cost;
-      for (const source of sources) {
+      let cost = (this.cardInfo[b.scryfall_id] || {}).mana || undefined;
+      for (const source of cost ? [] : sources) {
         for (const key of ['mana_cost', 'mtg_mana_cost', 'manaCost', 'casting_cost', 'castingCost']) {
           if (source[key] !== undefined && source[key] !== null && source[key] !== '') {
             cost = source[key];
@@ -294,15 +348,10 @@ Vue.createApp({
       else if (cost && typeof cost === 'object') cost = cost.value || cost.name || cost.symbol || '';
       if (typeof cost !== 'string') return [];
 
-      const tokens = cost.match(/\{([^}]+)\}|10|[0-9]+|[WUBRGCXYZT]/gi) || [];
-      const positions = { W: '-84px -42px', U: '-105px -42px', B: '-126px -42px',
-        R: '-147px -42px', G: '-168px -42px', C: '-21px -42px' };
+      const tokens = cost.match(/\{([^}]+)\}|[0-9]+|[WUBRGCXYZTS]/gi) || [];
       return tokens.map((raw, index) => {
         const token = (raw[0] === '{' ? raw.slice(1, -1) : raw).toUpperCase();
-        const number = /^\d+$/.test(token) ? Number(token) : null;
-        const position = number !== null && number <= 10 ? `${number * -21}px 0` :
-          (token.length === 1 ? positions[token] : null);
-        return { key: `${index}-${token}`, label: token, position };
+        return { key: `${index}-${token}`, label: token, position: this.manaSprite(token) };
       });
     },
     cardColors(b) {
@@ -387,6 +436,7 @@ Vue.createApp({
         this.box = Array.isArray(j) ? j : (j.array || j.ct0_box_items || j.items || []);
         this.boxLoaded = true;
         this.lastUpdate = new Date().toLocaleTimeString('it-IT');
+        this.loadCardInfo();
       } catch (e) { if (silent !== true) this.boxError = e.message; }
       this.busy = false;
       this.boxLoading = false;
