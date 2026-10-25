@@ -23,8 +23,8 @@ Vue.createApp({
     exp: { status: 'all', seller: '', q: '', format: 'text', withExp: false, merge: true, copied: false },
     COLORS: [
       { key: 'red', label: 'Rosso' },
-      { key: 'blue', label: 'Blu' },
       { key: 'green', label: 'Verde' },
+      { key: 'blue', label: 'Blu' },
       { key: 'white', label: 'Bianco' },
       { key: 'black', label: 'Nero' },
       { key: 'colorless', label: 'Incolore' },
@@ -107,8 +107,10 @@ Vue.createApp({
       return [...new Set(this.box.map(b => b.seller && b.seller.username).filter(Boolean))].sort();
     },
     rarities() {
+      const order = ['C', 'U', 'R', 'M', 'L'];
+      const rank = r => (order.includes(r) ? order.indexOf(r) : order.length);
       return [...new Set(this.box.map(b => this.rarityName(b)).filter(Boolean))]
-        .sort((a, b) => a.localeCompare(b, 'it'));
+        .sort((a, b) => rank(a) - rank(b) || a.localeCompare(b, 'it'));
     },
     expansions() {
       return [...new Set(this.box.map(b => this.expName(b)).filter(Boolean))]
@@ -371,7 +373,7 @@ Vue.createApp({
       const sources = [b, b.blueprint, b.card, b.properties].filter(value => value && typeof value === 'object');
       let raw;
       for (const source of sources) {
-        for (const key of ['colors', 'mana_colors', 'mtg_colors', 'mtg_card_colors', 'color_identity', 'color', 'mana_color', 'mtg_color']) {
+        for (const key of ['colors', 'mana_colors', 'mtg_colors', 'color_identity', 'color', 'mana_color', 'mtg_color']) {
           if (source[key] !== undefined && source[key] !== null) {
             raw = source[key];
             break;
